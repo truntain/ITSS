@@ -1,0 +1,414 @@
+
+Bạn là chuyên gia UI/UX và Product Designer.
+Hãy thiết kế giao diện Figma hoàn chỉnh cho một hệ thống quản lý phòng tập gym hiện đại, chuyên nghiệp và dễ sử dụng.
+
+## Yêu cầu tổng quát
+
+* Toàn bộ giao diện sử dụng TIẾNG VIỆT.
+* Phong cách thiết kế hiện đại, tối giản nhưng mạnh mẽ, phù hợp lĩnh vực fitness/gym.
+* Ưu tiên trải nghiệm người dùng rõ ràng, dễ thao tác.
+* Thiết kế responsive cho:
+
+  * Desktop Web
+  * Tablet
+  * Mobile
+* Sử dụng Auto Layout trong Figma.
+* Thiết kế theo Design System thống nhất:
+
+  * Typography rõ ràng
+  * Button style đồng bộ
+  * Form nhập liệu chuyên nghiệp
+  * Card UI hiện đại
+  * Sidebar + Topbar cố định
+* Có Light Mode.
+* Màu sắc đề xuất:
+
+  * Màu chính: Đen than (#121212) hoặc xanh đậm
+  * Màu nhấn: Cam năng động (#FF7A00) hoặc xanh neon
+  * Nền sáng/xám nhạt để dễ nhìn
+* Style tổng thể:
+
+  * Fitness
+  * Premium
+  * Công nghệ hiện đại
+  * Chuyên nghiệp như ứng dụng quản lý doanh nghiệp
+
+# Hệ thống có các vai trò
+
+1. Chủ phòng tập (Admin)
+2. Nhân viên quản lý
+3. Huấn luyện viên cá nhân (PT)
+4. Hội viên
+
+---
+
+# Yêu cầu thiết kế đầy đủ các màn hình
+
+# 1. Màn hình Authentication
+
+Thiết kế:
+
+* Đăng nhập
+* Đăng ký hội viên
+* Quên mật khẩu
+* Đổi mật khẩu
+* Xác thực OTP/email
+
+UI cần:
+
+* Form hiện đại
+* Background fitness/gym
+* Nút CTA nổi bật
+* Social login (Google/Facebook giả lập)
+
+---
+
+# 2. Dashboard Chủ phòng tập (Admin)
+
+Thiết kế dashboard chuyên nghiệp với:
+
+* Sidebar
+* Header
+* Notification
+* Avatar người dùng
+* Search bar
+
+Các widget:
+
+* Tổng doanh thu
+* Số hội viên hiện tại
+* Hội viên mới trong tháng
+* Gói tập sắp hết hạn
+* Thiết bị cần bảo trì
+* Biểu đồ doanh thu
+* Biểu đồ tăng trưởng hội viên
+* Thống kê số buổi tập
+
+Các màn hình con:
+
+* Quản lý phòng tập
+* Quản lý thiết bị
+* Quản lý nhân sự
+* Quản lý huấn luyện viên
+* Quản lý hội viên
+* Quản lý phản hồi
+* Quản lý gói tập
+* Quản lý thanh toán
+* Báo cáo thống kê
+* Cài đặt hệ thống
+
+---
+
+# 3. Quản lý phòng tập
+
+Thiết kế:
+
+* Danh sách phòng tập
+* Thêm phòng mới
+* Chỉnh sửa phòng
+* Chi tiết phòng
+
+Thông tin:
+
+* Mã phòng
+* Tên phòng
+* Loại phòng
+* Sức chứa
+* Trạng thái hoạt động
+
+UI:
+
+* Table hiện đại
+* Filter
+* Search
+* Pagination
+* Modal thêm/sửa
+
+---
+
+# 4. Quản lý thiết bị
+
+Thiết kế:
+
+* Danh sách thiết bị
+* Thêm thiết bị
+* Chi tiết thiết bị
+* Bảo trì thiết bị
+
+Thông tin:
+
+* Mã thiết bị
+* Tên thiết bị
+* Xuất xứ
+* Ngày nhập
+* Bảo hành
+* Trạng thái
+* Số lượng
+
+Có:
+
+* Tag trạng thái màu sắc
+* Timeline lịch sử bảo trì
+* Form báo lỗi thiết bị
+
+---
+
+# 5. Quản lý nhân sự
+
+Thiết kế:
+
+* Danh sách nhân viên
+* Hồ sơ nhân viên
+* Lịch làm việc
+* Đánh giá hiệu suất
+
+Vai trò:
+
+* Nhân viên quản lý
+* CSKH
+* PT
+
+UI:
+
+* Calendar lịch làm việc
+* Card nhân viên
+* Biểu đồ hiệu suất
+
+---
+
+# 6. Quản lý hội viên
+
+Thiết kế:
+
+* Danh sách hội viên
+* Hồ sơ hội viên
+* Lịch sử tập luyện
+* Điểm danh check-in
+* Gia hạn gói tập
+
+Thông tin:
+
+* Ảnh đại diện
+* Mã hội viên
+* Họ tên
+* Ngày sinh
+* Nghề nghiệp
+* Số điện thoại
+* Email
+* Loại thành viên
+
+Tính năng:
+
+* QR check-in
+* Vân tay (UI mô phỏng)
+* Thẻ hội viên digital
+
+---
+
+# 7. Quản lý gói tập
+
+Thiết kế:
+
+* Danh sách gói tập
+* Chi tiết gói
+* Đăng ký gói
+* Gia hạn gói
+
+Các loại:
+
+* Gói tháng
+* Gói quý
+* Gói năm
+* Gói VIP
+* Gói PT cá nhân
+
+UI:
+
+* Pricing card hiện đại
+* So sánh quyền lợi
+* CTA đăng ký nổi bật
+
+---
+
+# 8. Thanh toán
+
+Thiết kế:
+
+* Hóa đơn
+* Lịch sử thanh toán
+* Thanh toán online
+
+Hỗ trợ:
+
+* Tiền mặt
+* Chuyển khoản
+* Ví điện tử
+* QR Payment
+
+UI:
+
+* Receipt hiện đại
+* Transaction history
+* Payment success screen
+
+---
+
+# 9. Dashboard Huấn luyện viên cá nhân (PT)
+
+Thiết kế:
+
+* Danh sách học viên
+* Lịch tập
+* Theo dõi tiến độ
+* Đánh giá học viên
+
+Thông tin:
+
+* Chỉ số cơ thể
+* Mục tiêu tập luyện
+* Lịch sử tập
+* Ghi chú PT
+
+UI:
+
+* Progress chart
+* Workout plan card
+* Calendar
+
+---
+
+# 10. Dashboard Hội viên
+
+Thiết kế giao diện thân thiện, fitness hiện đại.
+
+Tính năng:
+
+* Thông tin gói tập
+* Số buổi còn lại
+* Lịch tập
+* Check-in
+* Lịch sử thanh toán
+* Theo dõi tiến độ cơ thể
+* Đánh giá dịch vụ
+* Nhận thông báo khuyến mãi
+
+UI:
+
+* Thẻ hội viên digital
+* Progress fitness
+* Biểu đồ cân nặng/BMI
+* QR cá nhân
+
+---
+
+# 11. Quản lý phản hồi
+
+Thiết kế:
+
+* Danh sách phản hồi
+* Chi tiết phản hồi
+* Trả lời phản hồi
+
+Có:
+
+* Rating sao
+* Feedback card
+* Bộ lọc trạng thái
+
+---
+
+# 12. Báo cáo thống kê
+
+Thiết kế:
+
+* Dashboard analytics chuyên nghiệp
+
+Bao gồm:
+
+* Doanh thu theo thời gian
+* Tỷ lệ gia hạn
+* Tỷ lệ hội viên hoạt động
+* Thiết bị hỏng
+* Hiệu suất PT
+
+UI:
+
+* Line chart
+* Bar chart
+* Pie chart
+* Export PDF/Excel button
+
+---
+
+# 13. Notification & Chat
+
+Thiết kế:
+
+* Notification center
+* Chat giữa hội viên và PT
+* Tin nhắn realtime giả lập
+
+UI:
+
+* Bubble chat hiện đại
+* Badge thông báo
+* Sidebar chat
+
+---
+
+# 14. Mobile App UI
+
+Thiết kế riêng giao diện mobile cho hội viên:
+
+* Trang chủ
+* Gói tập
+* Check-in QR
+* Lịch tập
+* Hồ sơ cá nhân
+* Thông báo
+
+Style:
+
+* Fitness app hiện đại
+* Bottom navigation
+
+---
+
+# Yêu cầu UX/UI chuyên sâu
+
+* Có user flow đầy đủ.
+* Có prototype flow giữa các màn hình.
+* Thiết kế accessibility tốt:
+
+  * Contrast rõ
+  * Font dễ đọc
+  * Nút đủ lớn
+* Thiết kế đồng bộ spacing/grid.
+* Sử dụng icon fitness/gym phù hợp.
+* Có empty state.
+* Có loading state.
+* Có error state.
+* Có success state.
+
+---
+
+# Yêu cầu output
+
+Hãy tạo:
+
+1. Sitemap hệ thống
+2. User flow
+3. Wireframe low-fidelity
+4. UI high-fidelity
+5. Design System
+6. Prototype flow
+7. Component library
+8. Responsive desktop + mobile
+
+Thiết kế cần mang cảm giác:
+
+* Cao cấp
+* Năng động
+* Chuyên nghiệp
+* Dễ dùng
+* Đúng phong cách gym/fitness hiện đại
