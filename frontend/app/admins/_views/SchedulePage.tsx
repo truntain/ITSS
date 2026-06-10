@@ -1,0 +1,572 @@
+"use client";
+
+import { ChevronLeft, ChevronRight, Copy, MapPin, Plus, X } from 'lucide-react';
+import { useState } from 'react';
+import { addWeeks, startOfWeek, format, isSameDay, addDays, differenceInWeeks } from 'date-fns';
+
+interface ShiftEvent {
+  id: string;
+  staffName: string;
+  role: 'manager' | 'pt' | 'receptionist';
+  time: string;
+  location: string;
+}
+
+interface DaySchedule {
+  date: Date;
+  shifts: ShiftEvent[];
+}
+
+// Mock staff data
+const staffMembers = [
+  { id: 'staff1', name: 'Nguyễn Văn A', role: 'manager' as const },
+  { id: 'staff2', name: 'Trần Thị B', role: 'pt' as const },
+  { id: 'staff3', name: 'Lê Văn C', role: 'receptionist' as const },
+  { id: 'staff4', name: 'Phạm Thị D', role: 'pt' as const },
+  { id: 'staff5', name: 'Hoàng Văn E', role: 'manager' as const },
+  { id: 'staff6', name: 'Vũ Thị F', role: 'pt' as const },
+  { id: 'staff7', name: 'Đặng Văn G', role: 'receptionist' as const },
+  { id: 'staff8', name: 'Bùi Thị H', role: 'pt' as const },
+];
+
+const locations = [
+  'Khu vực Tạ',
+  'Khu Cardio',
+  'Phòng Yoga',
+  'Lễ tân',
+  'Toàn bộ',
+];
+
+const shiftPresets = [
+  { label: 'Ca sáng', value: '06:00 - 14:00' },
+  { label: 'Ca chiều', value: '14:00 - 22:00' },
+  { label: 'Ca hành chính', value: '08:00 - 17:00' },
+];
+
+// Initial seed data for current week only
+const initialShifts: Record<string, ShiftEvent[]> = {
+  '2026-05-12': [ // Monday May 12
+    { id: '1', staffName: 'Nguyễn Văn A', role: 'manager', time: '06:00 - 14:00', location: 'Khu vực Tạ' },
+    { id: '2', staffName: 'Trần Thị B', role: 'pt', time: '14:00 - 22:00', location: 'Khu Cardio' },
+  ],
+  '2026-05-13': [ // Tuesday
+    { id: '3', staffName: 'Lê Văn C', role: 'receptionist', time: '06:00 - 14:00', location: 'Lễ tân' },
+    { id: '4', staffName: 'Phạm Thị D', role: 'pt', time: '18:00 - 22:00', location: 'Phòng Yoga' },
+  ],
+  '2026-05-17': [ // Saturday - today
+    { id: '12', staffName: 'Phan Thị M', role: 'manager', time: '08:00 - 16:00', location: 'Toàn bộ' },
+  ],
+};
+
+const getRoleColor = (role: string) => {
+  switch (role) {
+    case 'manager':
+      return 'bg-orange-100 text-orange-700 border-orange-200';
+    case 'pt':
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    case 'receptionist':
+      return 'bg-purple-100 text-purple-700 border-purple-200';
+    default:
+      return 'bg-gray-100 text-gray-700 border-gray-200';
+  }
+};
+
+const getRoleLabel = (role: string) => {
+  switch (role) {
+    case 'manager':
+      return 'Quản lý';
+    case 'pt':
+      return 'PT';
+    case 'receptionist':
+      return 'Lễ tân';
+    default:
+      return '';
+  }
+};
+
+export function SchedulePage() {
+  const [hoveredShift, setHoveredShift] = useState<string | null>(null);
+  const today = new Date(2026, 4, 17); // May 17, 2026 (Saturday)
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
+    startOfWeek(today, { weekStartsOn: 1 }) // Monday as first day
+  );
+
+  const [shifts, setShifts] = useState<Record<string, ShiftEvent[]>>(initialShifts);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // Form state
+  const [selectedStaff, setSelectedStaff] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [customStartTime, setCustomStartTime] = useState('');
+  const [customEndTime, setCustomEndTime] = useState('');
+
+  // Generate 7 days for the current week
+  const generateWeekDays = (weekStart: Date): DaySchedule[] => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const currentDay = addDays(weekStart, index);
+      const dateKey = format(currentDay, 'yyyy-MM-dd');
+
+      return {
+        date: currentDay,
+        shifts: shifts[dateKey] || [],
+      };
+    });
+  };
+
+  const currentWeekSchedule = generateWeekDays(currentWeekStart);
+
+  const getWeekLabel = () => {
+    const weekEnd = addDays(currentWeekStart, 6);
+    const startStr = format(currentWeekStart, 'dd/MM');
+    const endStr = format(weekEnd, 'dd/MM');
+
+    // Check if it's current week
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+    if (isSameDay(currentWeekStart, todayWeekStart)) {
+      return `Tuần này (${startStr} - ${endStr})`;
+    }
+
+    return `Tuần (${startStr} - ${endStr})`;
+  };
+
+  const goToPreviousWeek = () => {
+    setCurrentWeekStart(addWeeks(currentWeekStart, -1));
+  };
+
+  const goToNextWeek = () => {
+    // Only allow if not at 4-week limit
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const maxWeekStart = addWeeks(todayWeekStart, 4);
+    const nextWeekStart = addWeeks(currentWeekStart, 1);
+
+    if (nextWeekStart < maxWeekStart) {
+      setCurrentWeekStart(nextWeekStart);
+    }
+  };
+
+  // Check if at 4-week limit
+  const isAtWeekLimit = () => {
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const maxWeekStart = addWeeks(todayWeekStart, 4);
+    const nextWeekStart = addWeeks(currentWeekStart, 1);
+    return nextWeekStart >= maxWeekStart;
+  };
+
+  // Check if current week is beyond 4-week limit (should show blank)
+  const isBeyondLimit = () => {
+    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekDiff = differenceInWeeks(currentWeekStart, todayWeekStart);
+    return weekDiff >= 4;
+  };
+
+  const openAddShiftModal = (date: Date) => {
+    setSelectedDate(date);
+    setShowAddModal(true);
+    // Reset form
+    setSelectedStaff('');
+    setSelectedLocation('');
+    setSelectedPreset('');
+    setCustomStartTime('');
+    setCustomEndTime('');
+  };
+
+  const handleAddShift = () => {
+    if (!selectedDate || !selectedStaff || !selectedLocation) return;
+
+    const staff = staffMembers.find(s => s.id === selectedStaff);
+    if (!staff) return;
+
+    let shiftTime = '';
+    if (selectedPreset) {
+      const preset = shiftPresets.find(p => p.value === selectedPreset);
+      shiftTime = preset?.value || '';
+    } else if (customStartTime && customEndTime) {
+      shiftTime = `${customStartTime} - ${customEndTime}`;
+    } else {
+      return; // Invalid time
+    }
+
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const newShift: ShiftEvent = {
+      id: `shift-${Date.now()}`,
+      staffName: staff.name,
+      role: staff.role,
+      time: shiftTime,
+      location: selectedLocation,
+    };
+
+    setShifts(prev => ({
+      ...prev,
+      [dateKey]: [...(prev[dateKey] || []), newShift],
+    }));
+
+    setShowAddModal(false);
+  };
+
+  const copyLastWeekSchedule = () => {
+    const lastWeekStart = addWeeks(currentWeekStart, -1);
+    const newShifts: Record<string, ShiftEvent[]> = { ...shifts };
+
+    for (let i = 0; i < 7; i++) {
+      const lastWeekDate = addDays(lastWeekStart, i);
+      const currentWeekDate = addDays(currentWeekStart, i);
+
+      const lastWeekKey = format(lastWeekDate, 'yyyy-MM-dd');
+      const currentWeekKey = format(currentWeekDate, 'yyyy-MM-dd');
+
+      if (shifts[lastWeekKey]) {
+        // Copy shifts with new IDs
+        newShifts[currentWeekKey] = shifts[lastWeekKey].map(shift => ({
+          ...shift,
+          id: `shift-${Date.now()}-${Math.random()}`,
+        }));
+      }
+    }
+
+    setShifts(newShifts);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-[var(--foreground)]">Lịch làm việc</h2>
+          <p className="text-[var(--muted-foreground)]">Quản lý ca trực nhân viên</p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={goToPreviousWeek}
+            className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-[var(--foreground)]" />
+          </button>
+          <div className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg min-w-[220px] text-center">
+            <span className="font-medium text-[var(--foreground)]">{getWeekLabel()}</span>
+          </div>
+          <button
+            onClick={goToNextWeek}
+            disabled={isAtWeekLimit()}
+            className={`p-2 rounded-lg transition-colors ${
+              isAtWeekLimit()
+                ? 'opacity-40 cursor-not-allowed'
+                : 'hover:bg-[var(--secondary)]'
+            }`}
+          >
+            <ChevronRight className={`w-5 h-5 ${
+              isAtWeekLimit() ? 'text-[var(--muted-foreground)]' : 'text-[var(--foreground)]'
+            }`} />
+          </button>
+
+          <button
+            onClick={copyLastWeekSchedule}
+            className="ml-4 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          >
+            <Copy className="w-4 h-4" />
+            Copy lịch tuần trước
+          </button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      {isBeyondLimit() ? (
+        <div className="bg-white rounded-lg border border-[var(--border)] shadow-sm p-12 text-center">
+          <p className="text-[var(--muted-foreground)] text-lg">
+            Không thể xem lịch quá 4 tuần trong tương lai
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border border-[var(--border)] shadow-sm overflow-hidden">
+          <div className="grid grid-cols-7 border-b border-[var(--border)]">
+            {currentWeekSchedule.map((day, index) => {
+              const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+              const dayOfWeek = dayNames[index];
+              const isToday = isSameDay(day.date, today);
+
+              return (
+                <div
+                  key={index}
+                  className={`p-4 text-center border-r border-[var(--border)] last:border-r-0 transition-colors ${
+                    isToday
+                      ? 'bg-orange-100 border-orange-300'
+                      : dayOfWeek === 'CN'
+                      ? 'bg-red-50'
+                      : 'bg-[var(--secondary)]'
+                  }`}
+                >
+                  <p className={`text-xs mb-1 font-medium ${isToday ? 'text-orange-700' : 'text-[var(--muted-foreground)]'}`}>
+                    {dayOfWeek}
+                  </p>
+                  <p className={`font-bold ${isToday ? 'text-orange-800' : 'text-[var(--foreground)]'}`}>
+                    {format(day.date, 'dd/MM')}
+                  </p>
+                  {isToday && (
+                    <p className="text-[10px] text-orange-600 mt-1 font-medium">Hôm nay</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {currentWeekSchedule.map((day, dayIndex) => {
+              const isToday = isSameDay(day.date, today);
+
+              return (
+                <div
+                  key={dayIndex}
+                  className={`min-h-[320px] p-3 border-r border-[var(--border)] last:border-r-0 space-y-2 ${
+                    isToday ? 'bg-orange-50/20' : ''
+                  }`}
+                >
+                  {day.shifts.map((shift) => {
+                    const isShiftToday = isToday;
+
+                    return (
+                      <div
+                        key={shift.id}
+                        className="relative animate-fadeIn"
+                        onMouseEnter={() => setHoveredShift(shift.id)}
+                        onMouseLeave={() => setHoveredShift(null)}
+                      >
+                        <div
+                          className={`p-3 rounded-md border shadow-sm hover:shadow-md transition-all ${getRoleColor(shift.role)} ${
+                            isShiftToday
+                              ? 'ring-2 ring-orange-400 border-orange-300'
+                              : ''
+                          }`}
+                          style={{ fontFamily: 'Arial, sans-serif' }}
+                        >
+                          <div className="flex items-start justify-between mb-1">
+                            <p className="font-medium text-sm flex-1">{shift.staffName}</p>
+                            {isShiftToday && (
+                              <span className="text-[9px] px-1.5 py-0.5 bg-orange-500 text-white rounded-full font-medium">
+                                Đang diễn ra
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs opacity-80">{shift.time}</p>
+                          <p className="text-xs opacity-70 mt-1 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {shift.location}
+                          </p>
+                        </div>
+
+                        {/* Tooltip */}
+                        {hoveredShift === shift.id && (
+                          <div className={`absolute z-20 top-0 w-56 p-3 bg-white border border-slate-200 rounded-lg shadow-md ${
+                            dayIndex >= 5 ? 'right-full mr-2' : 'left-full ml-2'
+                          }`}>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-slate-500">Ca làm việc:</span>
+                                <span className="text-sm font-medium text-slate-800">{shift.time}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-slate-500">Vị trí trực:</span>
+                                <span className="text-sm font-medium text-slate-800">{shift.location}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Add Shift Button */}
+                  <button
+                    onClick={() => openAddShiftModal(day.date)}
+                    className="w-full p-3 border-2 border-dashed border-slate-300 hover:border-[var(--primary)] rounded-md text-slate-400 hover:text-[var(--primary)] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm font-medium">Thêm ca trực</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="flex items-center gap-6 bg-white rounded-lg p-4 border border-[var(--border)] shadow-sm">
+        <span className="text-sm font-medium text-[var(--foreground)]">Chú thích:</span>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-orange-100 border border-orange-200"></div>
+          <span className="text-sm text-[var(--muted-foreground)]">Quản lý</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200"></div>
+          <span className="text-sm text-[var(--muted-foreground)]">Huấn luyện viên PT</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-purple-100 border border-purple-200"></div>
+          <span className="text-sm text-[var(--muted-foreground)]">Lễ tân</span>
+        </div>
+      </div>
+
+      {/* Add Shift Modal */}
+      {showAddModal && selectedDate && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onClick={() => setShowAddModal(false)}
+          ></div>
+
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl border border-[var(--border)] shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col">
+              {/* Header - Fixed */}
+              <div className="p-6 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Thêm ca trực mới</h3>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {format(selectedDate, 'EEEE, dd/MM/yyyy')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Body - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
+                {/* Staff Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">
+                    Chọn nhân viên
+                  </label>
+                  <select
+                    value={selectedStaff}
+                    onChange={(e) => setSelectedStaff(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                  >
+                    <option value="">-- Chọn nhân viên --</option>
+                    {staffMembers.map(staff => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name} ({getRoleLabel(staff.role)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">
+                    Vị trí trực
+                  </label>
+                  <select
+                    value={selectedLocation}
+                    onChange={(e) => setSelectedLocation(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                  >
+                    <option value="">-- Chọn vị trí --</option>
+                    {locations.map(loc => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shift Time */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-900 mb-2">
+                    Ca làm việc
+                  </label>
+
+                  {/* Preset Options */}
+                  <div className="space-y-2 mb-3">
+                    {shiftPresets.map(preset => (
+                      <label
+                        key={preset.value}
+                        className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-slate-50"
+                      >
+                        <input
+                          type="radio"
+                          name="shift-preset"
+                          value={preset.value}
+                          checked={selectedPreset === preset.value}
+                          onChange={(e) => {
+                            setSelectedPreset(e.target.value);
+                            setCustomStartTime('');
+                            setCustomEndTime('');
+                          }}
+                          className="w-4 h-4 text-[var(--primary)] focus:ring-[var(--primary)]"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-900">{preset.label}</p>
+                          <p className="text-xs text-slate-600">{preset.value}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Custom Time Picker */}
+                  <div className="border-t border-slate-200 pt-3">
+                    <label className="flex items-center gap-3 mb-3">
+                      <input
+                        type="radio"
+                        name="shift-preset"
+                        checked={selectedPreset === '' && (customStartTime !== '' || customEndTime !== '')}
+                        onChange={() => setSelectedPreset('')}
+                        className="w-4 h-4 text-[var(--primary)] focus:ring-[var(--primary)]"
+                      />
+                      <span className="font-medium text-slate-900">Tùy chỉnh thời gian</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 ml-7">
+                      <div>
+                        <label className="block text-xs text-slate-600 mb-1">Giờ bắt đầu</label>
+                        <input
+                          type="time"
+                          value={customStartTime}
+                          onChange={(e) => {
+                            setCustomStartTime(e.target.value);
+                            setSelectedPreset('');
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-600 mb-1">Giờ kết thúc</label>
+                        <input
+                          type="time"
+                          value={customEndTime}
+                          onChange={(e) => {
+                            setCustomEndTime(e.target.value);
+                            setSelectedPreset('');
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer - Fixed */}
+              <div className="p-6 border-t border-slate-100 flex gap-3 justify-end flex-shrink-0">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleAddShift}
+                  disabled={!selectedStaff || !selectedLocation || (!selectedPreset && (!customStartTime || !customEndTime))}
+                  className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Lưu ca trực
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
