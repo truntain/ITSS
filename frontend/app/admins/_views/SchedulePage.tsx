@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Copy, MapPin, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { addWeeks, startOfWeek, format, isSameDay, addDays, differenceInWeeks } from 'date-fns';
 
 interface ShiftEvent {
@@ -84,6 +84,35 @@ const getRoleLabel = (role: string) => {
   }
 };
 
+const monthsList = [
+  { value: 0, label: 'Tháng 1' },
+  { value: 1, label: 'Tháng 2' },
+  { value: 2, label: 'Tháng 3' },
+  { value: 3, label: 'Tháng 4' },
+  { value: 4, label: 'Tháng 5' },
+  { value: 5, label: 'Tháng 6' },
+  { value: 6, label: 'Tháng 7' },
+  { value: 7, label: 'Tháng 8' },
+  { value: 8, label: 'Tháng 9' },
+  { value: 9, label: 'Tháng 10' },
+  { value: 10, label: 'Tháng 11' },
+  { value: 11, label: 'Tháng 12' },
+];
+
+const getFirstWeekOfMonth = (year: number, month: number): Date => {
+  let d = new Date(year, month, 1);
+  while (d.getDay() !== 1) {
+    d.setDate(d.getDate() + 1);
+  }
+  const firstMonday = new Date(d);
+  const prevMonday = new Date(firstMonday);
+  prevMonday.setDate(prevMonday.getDate() - 7);
+  if (prevMonday.getMonth() === month || (firstMonday.getDate() > 1 && firstMonday.getDate() <= 7)) {
+    return prevMonday;
+  }
+  return firstMonday;
+};
+
 export function SchedulePage() {
   const [hoveredShift, setHoveredShift] = useState<string | null>(null);
   const today = new Date(2026, 4, 17); // May 17, 2026 (Saturday)
@@ -91,7 +120,9 @@ export function SchedulePage() {
     startOfWeek(today, { weekStartsOn: 1 }) // Monday as first day
   );
 
-  const [shifts, setShifts] = useState<Record<string, ShiftEvent[]>>(initialShifts);
+  const [shifts, setShifts] = useState<Record<string, ShiftEvent[]>>({});
+  const [staffsList, setStaffsList] = useState<{ id: string; name: string; role: 'manager' | 'pt' | 'receptionist' }[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -101,6 +132,106 @@ export function SchedulePage() {
   const [selectedPreset, setSelectedPreset] = useState('');
   const [customStartTime, setCustomStartTime] = useState('');
   const [customEndTime, setCustomEndTime] = useState('');
+
+  // Month & Week selection states
+  const [selectedMonth, setSelectedMonth] = useState(currentWeekStart.getMonth());
+  const [selectedYear, setSelectedYear] = useState(currentWeekStart.getFullYear());
+  const [weeksInMonth, setWeeksInMonth] = useState<Date[]>([]);
+
+
+
+  useEffect(() => {
+    const year = selectedYear;
+    const month = selectedMonth;
+    const mondays: Date[] = [];
+    
+    let d = new Date(year, month, 1);
+    while (d.getDay() !== 1) {
+      d.setDate(d.getDate() + 1);
+    }
+    
+    const firstMonday = new Date(d);
+    const prevMonday = new Date(firstMonday);
+    prevMonday.setDate(prevMonday.getDate() - 7);
+    if (prevMonday.getMonth() === month || (firstMonday.getDate() > 1 && firstMonday.getDate() <= 7)) {
+      mondays.push(prevMonday);
+    }
+    
+    while (d.getMonth() === month) {
+      mondays.push(new Date(d));
+      d.setDate(d.getDate() + 7);
+    }
+    
+    setWeeksInMonth(mondays);
+  }, [selectedMonth, selectedYear]);
+
+  const mapDbRoleToFrontend = (dbRole: string): 'manager' | 'pt' | 'receptionist' => {
+    if (dbRole === 'PT') return 'pt';
+    if (dbRole === 'AD') return 'manager';
+    return 'receptionist';
+  };
+
+  const fetchStaffs = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch('http://localhost:3001/staffs', {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map((user: any) => ({
+          id: String(user.id),
+          name: user.fullName || user.email,
+          role: mapDbRoleToFrontend(user.role),
+        }));
+        setStaffsList(formatted);
+      })
+      .catch(err => console.error('Error fetching staffs:', err));
+  }, []);
+
+  const fetchShifts = useCallback(() => {
+    const startDate = format(currentWeekStart, 'yyyy-MM-dd');
+    const endDate = format(addDays(currentWeekStart, 6), 'yyyy-MM-dd');
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(data => {
+        const grouped: Record<string, ShiftEvent[]> = {};
+        data.forEach((item: any) => {
+          const dateKey = item.date;
+          if (!grouped[dateKey]) {
+            grouped[dateKey] = [];
+          }
+          const frontendRole = mapDbRoleToFrontend(item.employee?.role || 'NV');
+          const startTime = item.startTime.slice(0, 5);
+          const endTime = item.endTime.slice(0, 5);
+          
+          grouped[dateKey].push({
+            id: String(item.id),
+            staffName: item.employee?.fullName || 'N/A',
+            role: frontendRole,
+            time: `${startTime} - ${endTime}`,
+            location: item.roleShift || '',
+          });
+        });
+        setShifts(grouped);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching shifts:', err);
+        setLoading(false);
+      });
+  }, [currentWeekStart]);
+
+  useEffect(() => {
+    fetchStaffs();
+  }, [fetchStaffs]);
+
+  useEffect(() => {
+    fetchShifts();
+  }, [fetchShifts]);
 
   // Generate 7 days for the current week
   const generateWeekDays = (weekStart: Date): DaySchedule[] => {
@@ -132,33 +263,29 @@ export function SchedulePage() {
   };
 
   const goToPreviousWeek = () => {
-    setCurrentWeekStart(addWeeks(currentWeekStart, -1));
+    const nextWeek = addWeeks(currentWeekStart, -1);
+    setCurrentWeekStart(nextWeek);
+    const middleOfWeek = addDays(nextWeek, 3);
+    setSelectedMonth(middleOfWeek.getMonth());
+    setSelectedYear(middleOfWeek.getFullYear());
   };
 
   const goToNextWeek = () => {
-    // Only allow if not at 4-week limit
-    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-    const maxWeekStart = addWeeks(todayWeekStart, 4);
-    const nextWeekStart = addWeeks(currentWeekStart, 1);
-
-    if (nextWeekStart < maxWeekStart) {
-      setCurrentWeekStart(nextWeekStart);
-    }
+    const nextWeek = addWeeks(currentWeekStart, 1);
+    setCurrentWeekStart(nextWeek);
+    const middleOfWeek = addDays(nextWeek, 3);
+    setSelectedMonth(middleOfWeek.getMonth());
+    setSelectedYear(middleOfWeek.getFullYear());
   };
 
   // Check if at 4-week limit
   const isAtWeekLimit = () => {
-    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-    const maxWeekStart = addWeeks(todayWeekStart, 4);
-    const nextWeekStart = addWeeks(currentWeekStart, 1);
-    return nextWeekStart >= maxWeekStart;
+    return false;
   };
 
   // Check if current week is beyond 4-week limit (should show blank)
   const isBeyondLimit = () => {
-    const todayWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-    const weekDiff = differenceInWeeks(currentWeekStart, todayWeekStart);
-    return weekDiff >= 4;
+    return false;
   };
 
   const openAddShiftModal = (date: Date) => {
@@ -175,57 +302,104 @@ export function SchedulePage() {
   const handleAddShift = () => {
     if (!selectedDate || !selectedStaff || !selectedLocation) return;
 
-    const staff = staffMembers.find(s => s.id === selectedStaff);
-    if (!staff) return;
+    let startTimeStr = '';
+    let endTimeStr = '';
 
-    let shiftTime = '';
     if (selectedPreset) {
-      const preset = shiftPresets.find(p => p.value === selectedPreset);
-      shiftTime = preset?.value || '';
+      const [start, end] = selectedPreset.split(' - ');
+      startTimeStr = start;
+      endTimeStr = end;
     } else if (customStartTime && customEndTime) {
-      shiftTime = `${customStartTime} - ${customEndTime}`;
+      startTimeStr = customStartTime;
+      endTimeStr = customEndTime;
     } else {
       return; // Invalid time
     }
 
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const newShift: ShiftEvent = {
-      id: `shift-${Date.now()}`,
-      staffName: staff.name,
-      role: staff.role,
-      time: shiftTime,
-      location: selectedLocation,
+    const payload = {
+      employeeId: parseInt(selectedStaff, 10),
+      date: format(selectedDate, 'yyyy-MM-dd'),
+      startTime: startTimeStr,
+      endTime: endTimeStr,
+      roleShift: selectedLocation,
     };
 
-    setShifts(prev => ({
-      ...prev,
-      [dateKey]: [...(prev[dateKey] || []), newShift],
-    }));
-
-    setShowAddModal(false);
+    const token = localStorage.getItem('token');
+    fetch('http://localhost:3001/work-shifts', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to create shift');
+        return res.json();
+      })
+      .then(() => {
+        fetchShifts();
+        setShowAddModal(false);
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Lỗi khi lưu ca trực');
+      });
   };
 
   const copyLastWeekSchedule = () => {
     const lastWeekStart = addWeeks(currentWeekStart, -1);
-    const newShifts: Record<string, ShiftEvent[]> = { ...shifts };
+    const startDate = format(lastWeekStart, 'yyyy-MM-dd');
+    const endDate = format(addDays(lastWeekStart, 6), 'yyyy-MM-dd');
+    const token = localStorage.getItem('token');
 
-    for (let i = 0; i < 7; i++) {
-      const lastWeekDate = addDays(lastWeekStart, i);
-      const currentWeekDate = addDays(currentWeekStart, i);
+    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.length === 0) {
+          alert('Tuần trước không có ca trực nào để copy!');
+          return;
+        }
 
-      const lastWeekKey = format(lastWeekDate, 'yyyy-MM-dd');
-      const currentWeekKey = format(currentWeekDate, 'yyyy-MM-dd');
+        const payload = data.map((item: any) => {
+          const originalDate = new Date(item.date);
+          const newDate = addDays(originalDate, 7);
+          return {
+            employeeId: item.employeeId,
+            date: format(newDate, 'yyyy-MM-dd'),
+            startTime: item.startTime,
+            endTime: item.endTime,
+            roleShift: item.roleShift,
+          };
+        });
 
-      if (shifts[lastWeekKey]) {
-        // Copy shifts with new IDs
-        newShifts[currentWeekKey] = shifts[lastWeekKey].map(shift => ({
-          ...shift,
-          id: `shift-${Date.now()}-${Math.random()}`,
-        }));
-      }
-    }
-
-    setShifts(newShifts);
+        return fetch('http://localhost:3001/work-shifts/bulk', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+      })
+      .then(res => {
+        if (res) {
+          if (!res.ok) throw new Error('Bulk copy failed');
+          return res.json();
+        }
+      })
+      .then(saved => {
+        if (saved) {
+          fetchShifts();
+          alert('Copy lịch tuần trước thành công!');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Lỗi khi copy lịch trực');
+      });
   };
 
   return (
@@ -237,29 +411,81 @@ export function SchedulePage() {
           <p className="text-[var(--muted-foreground)]">Quản lý ca trực nhân viên</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={goToPreviousWeek}
-            className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Chọn Năm */}
+          <select
+            value={selectedYear}
+            onChange={(e) => {
+              const newYear = parseInt(e.target.value, 10);
+              setSelectedYear(newYear);
+              const firstWeek = getFirstWeekOfMonth(newYear, selectedMonth);
+              setCurrentWeekStart(firstWeek);
+            }}
+            className="px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--primary)] cursor-pointer"
           >
-            <ChevronLeft className="w-5 h-5 text-[var(--foreground)]" />
-          </button>
-          <div className="px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg min-w-[220px] text-center">
-            <span className="font-medium text-[var(--foreground)]">{getWeekLabel()}</span>
+            {[2025, 2026, 2027, 2028].map(y => (
+              <option key={y} value={y}>Năm {y}</option>
+            ))}
+          </select>
+
+          {/* Chọn Tháng */}
+          <select
+            value={selectedMonth}
+            onChange={(e) => {
+              const newMonth = parseInt(e.target.value, 10);
+              setSelectedMonth(newMonth);
+              const firstWeek = getFirstWeekOfMonth(selectedYear, newMonth);
+              setCurrentWeekStart(firstWeek);
+            }}
+            className="px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--primary)] cursor-pointer"
+          >
+            {monthsList.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+
+          {/* Chọn Tuần */}
+          <select
+            value={format(currentWeekStart, 'yyyy-MM-dd')}
+            onChange={(e) => {
+              const selectedDateObj = new Date(e.target.value);
+              setCurrentWeekStart(selectedDateObj);
+            }}
+            className="px-3 py-2 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--primary)] min-w-[220px] cursor-pointer"
+          >
+            {weeksInMonth.map((week, idx) => {
+              const end = addDays(week, 6);
+              const val = format(week, 'yyyy-MM-dd');
+              return (
+                <option key={val} value={val}>
+                  Tuần {idx + 1} ({format(week, 'dd/MM')} - {format(end, 'dd/MM')})
+                </option>
+              );
+            })}
+            {!weeksInMonth.some(w => format(w, 'yyyy-MM-dd') === format(currentWeekStart, 'yyyy-MM-dd')) && (
+              <option value={format(currentWeekStart, 'yyyy-MM-dd')}>
+                Tuần đang chọn ({format(currentWeekStart, 'dd/MM')} - {format(addDays(currentWeekStart, 6), 'dd/MM')})
+              </option>
+            )}
+          </select>
+
+          {/* Nút Điều Hướng */}
+          <div className="flex items-center border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--card)] shadow-sm">
+            <button
+              onClick={goToPreviousWeek}
+              className="p-2 hover:bg-[var(--secondary)] border-r border-[var(--border)] transition-colors"
+              title="Tuần trước"
+            >
+              <ChevronLeft className="w-5 h-5 text-[var(--foreground)]" />
+            </button>
+            <button
+              onClick={goToNextWeek}
+              className="p-2 hover:bg-[var(--secondary)] transition-colors"
+              title="Tuần sau"
+            >
+              <ChevronRight className="w-5 h-5 text-[var(--foreground)]" />
+            </button>
           </div>
-          <button
-            onClick={goToNextWeek}
-            disabled={isAtWeekLimit()}
-            className={`p-2 rounded-lg transition-colors ${
-              isAtWeekLimit()
-                ? 'opacity-40 cursor-not-allowed'
-                : 'hover:bg-[var(--secondary)]'
-            }`}
-          >
-            <ChevronRight className={`w-5 h-5 ${
-              isAtWeekLimit() ? 'text-[var(--muted-foreground)]' : 'text-[var(--foreground)]'
-            }`} />
-          </button>
 
           <button
             onClick={copyLastWeekSchedule}
@@ -447,7 +673,7 @@ export function SchedulePage() {
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
                   >
                     <option value="">-- Chọn nhân viên --</option>
-                    {staffMembers.map(staff => (
+                    {staffsList.map(staff => (
                       <option key={staff.id} value={staff.id}>
                         {staff.name} ({getRoleLabel(staff.role)})
                       </option>

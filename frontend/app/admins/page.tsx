@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Toaster } from 'sonner';
 import { Sidebar } from './_components/Sidebar';
 import { Header } from './_components/Header';
@@ -15,7 +16,36 @@ import { RevenuePage } from './_views/RevenuePage';
 import { FacilityPage } from './_views/FacilityPage';
 
 export default function AdminsPage() {
+  const router = useRouter();
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('currentUser');
+    if (!token || !userStr) {
+      router.replace('/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role !== 'AD') {
+        router.replace('/login');
+        return;
+      }
+      setAuthorized(true);
+    } catch (e) {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-500 font-medium">Đang xác thực quyền truy cập...</p>
+      </div>
+    );
+  }
 
   const getPageTitle = (): string => {
     switch (activeMenu) {
@@ -86,7 +116,8 @@ export default function AdminsPage() {
           <Header
             pageTitle={getPageTitle()}
             onLogout={() => {
-              // Redirect to login page
+              localStorage.removeItem('token');
+              localStorage.removeItem('currentUser');
               window.location.href = '/login';
             }}
           />

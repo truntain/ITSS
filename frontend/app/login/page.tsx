@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff, User, Shield, Dumbbell, Briefcase } from 'lucide-react';
+import { toast, Toaster } from 'sonner';
 
 type DemoRole = 'admin' | 'pt' | 'user' | 'staff' | null;
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [selectedRole, setSelectedRole] = useState<DemoRole>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleRoleSelect = (role: DemoRole) => {
     setSelectedRole(role);
@@ -43,7 +45,8 @@ export default function LoginPage() {
     setPasswordError(false);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    setLoginError(null);
     // Validate inputs
     const errors = {
       email: !emailOrPhone.trim(),
@@ -54,18 +57,48 @@ export default function LoginPage() {
     setPasswordError(errors.password);
 
     if (!errors.email && !errors.password) {
-      // Determine role from selected role or default to admin
-      const role = selectedRole || 'admin';
-      
-      // Navigate to correct page based on role
-      if (role === 'admin') {
-        router.push('/admins');
-      } else if (role === 'pt') {
-        router.push('/PT');
-      } else if (role === 'user') {
-        router.push('/members');
-      } else if (role === 'staff') {
-        router.push('/staffs');
+      try {
+        const response = await fetch('http://localhost:3001/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: emailOrPhone,
+            password: password,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || 'Email hoặc mật khẩu không hợp lệ!');
+        }
+
+        const data = await response.json();
+        
+        // Save to localStorage
+        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+
+        toast.success('Đăng nhập thành công!');
+
+        // Determine destination based on user.role
+        const role = data.user.role;
+        if (role === 'AD') {
+          router.push('/admins');
+        } else if (role === 'PT') {
+          router.push('/PT');
+        } else if (role === 'HV') {
+          router.push('/members');
+        } else if (role === 'NV') {
+          router.push('/staffs');
+        } else {
+          toast.error('Vai trò người dùng không hợp lệ!');
+        }
+      } catch (error: any) {
+        console.error('Login error:', error);
+        setLoginError(error.message || 'Lỗi hệ thống khi đăng nhập!');
+        toast.error(error.message || 'Lỗi hệ thống khi đăng nhập!');
       }
     }
   };
@@ -78,6 +111,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <Toaster position="top-right" richColors />
       {/* Login Card */}
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
         {/* Logo Section */}
@@ -157,6 +191,12 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          {loginError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg font-medium text-center">
+              ⚠️ {loginError}
+            </div>
+          )}
 
           {/* Email or Phone Input */}
           <div className="mb-4">

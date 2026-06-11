@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Toaster } from 'sonner';
 import { StaffSidebar } from './_components/StaffSidebar';
 import { StaffHeader } from './_components/StaffHeader';
@@ -11,7 +12,36 @@ import { StaffFeedbackPage } from './_views/StaffFeedbackPage';
 import { StaffSchedulePage } from './_views/StaffSchedulePage';
 
 export default function StaffsPage() {
+  const router = useRouter();
   const [activeMenu, setActiveMenu] = useState('sales');
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('currentUser');
+    if (!token || !userStr) {
+      router.replace('/login');
+      return;
+    }
+    try {
+      const user = JSON.parse(userStr);
+      if (user.role !== 'NV') {
+        router.replace('/login');
+        return;
+      }
+      setAuthorized(true);
+    } catch (e) {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-500 font-medium">Đang xác thực quyền truy cập...</p>
+      </div>
+    );
+  }
 
   const getStaffPageTitle = (): string => {
     switch (activeMenu) {
@@ -44,6 +74,8 @@ export default function StaffsPage() {
           <StaffHeader
             pageTitle={getStaffPageTitle()}
             onLogout={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('currentUser');
               window.location.href = '/login';
             }}
           />

@@ -12,6 +12,18 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [user, setUser] = useState<{ id: number; fullName: string; email: string; phone: string; role: string } | null>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -43,7 +55,7 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
                   <span className="text-white font-bold text-xs">NV</span>
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-sm font-medium text-[var(--foreground)] leading-none">Nguyễn Văn A</p>
+                  <p className="text-sm font-medium text-[var(--foreground)] leading-none">{user?.fullName || 'Nguyễn Văn A'}</p>
                   <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Nhân viên</p>
                 </div>
                 <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)]" />
@@ -52,8 +64,8 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
               {showMenu && (
                 <div className="absolute right-0 mt-2 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
                   <div className="px-4 py-3 border-b border-slate-100">
-                    <p className="text-sm font-bold text-slate-900">Nguyễn Văn A</p>
-                    <p className="text-xs text-slate-500">staff@gympro.com</p>
+                    <p className="text-sm font-bold text-slate-900">{user?.fullName || 'Nguyễn Văn A'}</p>
+                    <p className="text-xs text-slate-500">{user?.email || 'staff@gympro.com'}</p>
                     <p className="text-xs text-orange-500 font-medium mt-0.5">Ca: 06:00 – 14:00</p>
                   </div>
                   <button
@@ -93,18 +105,18 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
                   <span className="text-white font-bold text-xl">NV</span>
                 </div>
                 <div>
-                  <p className="font-bold text-slate-800 text-lg">Nguyễn Văn A</p>
-                  <p className="text-slate-500 text-sm">Nhân viên lễ tân</p>
+                  <p className="font-bold text-slate-800 text-lg">{user?.fullName || 'Nguyễn Văn A'}</p>
+                  <p className="text-slate-500 text-sm">Nhân viên</p>
                   <span className="inline-block mt-1 text-xs bg-orange-100 text-orange-600 font-semibold px-2 py-0.5 rounded-full">Đang hoạt động</span>
                 </div>
               </div>
               <div className="space-y-3 text-sm">
                 {[
-                  { label: 'Mã nhân viên', value: 'NV-2024-001' },
-                  { label: 'Email', value: 'staff@gympro.com' },
-                  { label: 'Số điện thoại', value: '0909 123 456' },
+                  { label: 'Mã nhân viên', value: `NV-2026-${String(user?.id || '001').padStart(3, '0')}` },
+                  { label: 'Email', value: user?.email || 'staff@gympro.com' },
+                  { label: 'Số điện thoại', value: user?.phone || '0909 123 456' },
                   { label: 'Ca làm việc', value: '06:00 – 14:00' },
-                  { label: 'Ngày vào làm', value: '15/03/2024' },
+                  { label: 'Ngày vào làm', value: '15/03/2026' },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between py-2 border-b border-slate-100 last:border-0">
                     <span className="text-slate-500">{row.label}</span>

@@ -1,57 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellDot, ChevronLeft, ChevronRight } from 'lucide-react';
 
 type ViewMode = 'month' | 'week';
 
 interface ShiftDay { date: string; shift: string; type: 'morning' | 'afternoon' | 'off' }
-
-// shifts keyed by YYYY-MM-DD
-const ALL_SHIFTS: ShiftDay[] = [
-  // June 2026
-  { date: '2026-06-02', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-03', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-05', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-06-06', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-09', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-10', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-12', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-06-13', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-16', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-17', shift: 'Nghỉ phép', type: 'off' },
-  { date: '2026-06-19', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-20', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-23', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-06-24', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-26', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-27', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-06-30', shift: '06:00–14:00', type: 'morning' },
-  // July 2026
-  { date: '2026-07-01', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-07-02', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-07-03', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-07-06', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-07-07', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-07-08', shift: 'Nghỉ phép', type: 'off' },
-  { date: '2026-07-09', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-07-10', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-07-13', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-07-14', shift: '06:00–14:00', type: 'morning' },
-  // May 2026
-  { date: '2026-05-04', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-05', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-05-06', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-11', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-12', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-13', shift: 'Nghỉ phép', type: 'off' },
-  { date: '2026-05-18', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-05-19', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-20', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-25', shift: '06:00–14:00', type: 'morning' },
-  { date: '2026-05-26', shift: '14:00–22:00', type: 'afternoon' },
-  { date: '2026-05-27', shift: '06:00–14:00', type: 'morning' },
-];
 
 const shiftStyle = {
   morning: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700' },
@@ -96,7 +50,63 @@ export function StaffSchedulePage() {
   const [readSet, setReadSet] = useState<Set<number>>(new Set([4, 5]));
   const [selectedDate, setSelectedDate] = useState<string | null>(toKey(TODAY));
 
-  const shiftMap = new Map(ALL_SHIFTS.map(s => [s.date, s]));
+  const [shifts, setShifts] = useState<ShiftDay[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.id) {
+          setSelectedEmployeeId(String(user.id));
+        }
+      } catch (e) {
+        console.error('Failed to parse user from localStorage:', e);
+      }
+    }
+  }, []);
+
+  const fetchShifts = useCallback(() => {
+    if (!selectedEmployeeId) return;
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    fetch(`http://localhost:3001/work-shifts?employeeId=${selectedEmployeeId}&startDate=2026-01-01&endDate=2026-12-31`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map((item: any) => {
+          const startTime = item.startTime.slice(0, 5);
+          const endTime = item.endTime.slice(0, 5);
+          const startHour = parseInt(startTime.split(':')[0], 10);
+          
+          let type: 'morning' | 'afternoon' | 'off' = 'morning';
+          if (startHour >= 12) {
+            type = 'afternoon';
+          }
+          
+          return {
+            date: item.date,
+            shift: `${startTime}–${endTime}`,
+            type,
+          };
+        });
+        setShifts(formatted);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching shifts:', err);
+        setLoading(false);
+      });
+  }, [selectedEmployeeId]);
+
+  useEffect(() => {
+    fetchShifts();
+  }, [fetchShifts]);
+
+  const shiftMap = new Map(shifts.map(s => [s.date, s]));
   const unreadCount = NOTICES.filter(n => !readSet.has(n.id)).length;
 
   // ---- MONTH VIEW ----
@@ -218,7 +228,9 @@ export function StaffSchedulePage() {
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
           {/* View toggle */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-[var(--foreground)]">Lịch cá nhân</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-[var(--foreground)]">Lịch cá nhân</h2>
+            </div>
             <div className="flex gap-1 bg-[var(--secondary)] p-0.5 rounded-lg">
               {(['month', 'week'] as const).map(v => (
                 <button key={v} onClick={() => setView(v)}

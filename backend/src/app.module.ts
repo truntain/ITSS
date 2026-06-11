@@ -6,6 +6,10 @@ import { AppService } from './app.service';
 import { DataSource } from 'typeorm';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { StaffsModule } from './staffs/staffs.module';
+import { TrainersModule } from './trainers/trainers.module';
+import { AdminModule } from './admin/admin.module';
+import { WorkShiftsModule } from './work-shifts/work-shifts.module';
 
 @Module({
   imports: [
@@ -30,6 +34,10 @@ import { AuthModule } from './auth/auth.module';
     }),
     UsersModule,
     AuthModule,
+    StaffsModule,
+    TrainersModule,
+    AdminModule,
+    WorkShiftsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

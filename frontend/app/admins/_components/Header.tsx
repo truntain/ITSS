@@ -13,6 +13,19 @@ export function Header({ pageTitle = 'Trang chủ', onLogout }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const [user, setUser] = useState<{ fullName: string; email: string } | null>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -67,10 +80,10 @@ export function Header({ pageTitle = 'Trang chủ', onLogout }: HeaderProps) {
 
             {/* Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
                 <div className="px-4 py-3 border-b border-slate-200">
-                  <p className="text-sm font-bold text-slate-900">Admin User</p>
-                  <p className="text-xs text-slate-500">admin@gympro.com</p>
+                  <p className="text-sm font-bold text-slate-900">{user?.fullName || 'Admin User'}</p>
+                  <p className="text-xs text-slate-500">{user?.email || 'admin@gympro.com'}</p>
                 </div>
 
                 <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3">
