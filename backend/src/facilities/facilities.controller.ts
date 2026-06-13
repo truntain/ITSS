@@ -7,6 +7,7 @@ import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
 import { CreateEquipmentReportDto } from './dto/create-equipment-report.dto';
 import { UpdateEquipmentReportDto } from './dto/update-equipment-report.dto';
+import { UpdateGymSettingDto } from './dto/update-gym-setting.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +22,19 @@ export class FacilitiesController {
   // ==========================================
   // 1. ENDPOINTS PHÒNG TẬP (FACILITY)
   // ==========================================
+  @Get('settings')
+  @ApiOperation({ summary: 'Xem cài đặt chung của phòng tập (Gym Settings)' })
+  getGymSettings() {
+    return this.facilitiesService.getGymSettings();
+  }
+
+  @Patch('settings')
+  @Roles('AD')
+  @ApiOperation({ summary: 'Cập nhật cài đặt chung của phòng tập (Gym Settings) (Admin)' })
+  updateGymSettings(@Body() updateGymSettingDto: UpdateGymSettingDto) {
+    return this.facilitiesService.updateGymSettings(updateGymSettingDto);
+  }
+
   @Post()
   @Roles('AD')
   @ApiOperation({ summary: 'Tạo phòng tập mới (Admin)' })

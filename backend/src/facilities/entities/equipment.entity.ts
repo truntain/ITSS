@@ -3,6 +3,7 @@ import { Facility } from './facility.entity';
 import { EquipmentReport } from './equipment-report.entity';
 
 export type EquipmentStatus = 'active' | 'maintenance' | 'broken';
+export type EquipmentCategory = 'Cardio' | 'Strength' | 'Classroom' | 'Others';
 
 @Entity('equipment')
 export class Equipment {
@@ -17,6 +18,13 @@ export class Equipment {
 
   @Column({ name: 'facility_id' })
   facilityId: number;
+
+  @Column({
+    type: 'enum',
+    enum: ['Cardio', 'Strength', 'Classroom', 'Others'],
+    default: 'Others',
+  })
+  category: EquipmentCategory;
 
   @Column({
     type: 'varchar',

@@ -1,103 +1,81 @@
 "use client";
 
 import { Star, Send, Paperclip, X, Filter, MessageCircle, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Feedback {
-  id: string;
-  customerName: string;
-  avatar: string;
-  rating: number;
-  message: string;
-  date: string;
-  status: 'unprocessed' | 'priority' | 'resolved';
-  replies?: { from: 'customer' | 'admin'; message: string; time: string }[];
+  id: number;
+  userId: number;
+  content: string;
+  replyContent?: string;
+  replierId?: number;
+  status: 'pending' | 'responded';
+  createdAt: string;
+  repliedAt?: string;
+  user?: {
+    id: number;
+    fullName: string;
+    email: string;
+  };
+  replier?: {
+    id: number;
+    fullName: string;
+    email: string;
+  };
 }
 
-const feedbacks: Feedback[] = [
-  {
-    id: 'FB001',
-    customerName: 'Nguyễn Văn An',
-    avatar: 'NA',
-    rating: 5,
-    message: 'Phòng tập rất sạch sẽ, thoáng mát. Nhân viên nhiệt tình!',
-    date: '13/05/2026 14:30',
-    status: 'unprocessed'
-  },
-  {
-    id: 'FB002',
-    customerName: 'Trần Thị Bình',
-    avatar: 'TB',
-    rating: 4,
-    message: 'Máy chạy bộ số 3 bị rung lắc. Mong phòng tập kiểm tra lại.',
-    date: '12/05/2026 18:15',
-    status: 'priority',
-    replies: [
-      { from: 'customer', message: 'Máy chạy bộ số 3 bị rung lắc. Mong phòng tập kiểm tra lại.', time: '18:15' },
-      { from: 'admin', message: 'Cảm ơn bạn đã phản hồi! Chúng tôi sẽ kiểm tra và sửa chữa ngay.', time: '18:30' }
-    ]
-  },
-  {
-    id: 'FB003',
-    customerName: 'Lê Minh Cường',
-    avatar: 'LC',
-    rating: 5,
-    message: 'Huấn luyện viên PT rất chuyên nghiệp và tận tình!',
-    date: '11/05/2026 20:00',
-    status: 'resolved',
-    replies: [
-      { from: 'customer', message: 'Huấn luyện viên PT rất chuyên nghiệp và tận tình!', time: '20:00' },
-      { from: 'admin', message: 'Cảm ơn anh đã tin tưởng GymPro. Chúc anh tập luyện hiệu quả!', time: '20:15' }
-    ]
-  },
-  {
-    id: 'FB004',
-    customerName: 'Phạm Thu Dung',
-    avatar: 'PD',
-    rating: 3,
-    message: 'Phòng thay đồ hơi chật vào giờ cao điểm.',
-    date: '10/05/2026 19:45',
-    status: 'unprocessed'
-  },
-  {
-    id: 'FB005',
-    customerName: 'Hoàng Văn Em',
-    avatar: 'HE',
-    rating: 2,
-    message: 'Điều hòa không mát lắm, trời nóng tập rất khó chịu.',
-    date: '09/05/2026 17:30',
-    status: 'priority'
-  },
-  {
-    id: 'FB006',
-    customerName: 'Vũ Thị Phương',
-    avatar: 'VP',
-    rating: 5,
-    message: 'Không gian đẹp, âm nhạc hay. Rất thích!',
-    date: '08/05/2026 21:00',
-    status: 'resolved'
-  },
-];
-
 export function SupportPage() {
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
-  const [feedbackStatuses, setFeedbackStatuses] = useState<Record<string, 'unprocessed' | 'priority' | 'resolved'>>(
-    feedbacks.reduce((acc, fb) => ({ ...acc, [fb.id]: fb.status }), {})
-  );
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState<string | null>(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
 
-  const filteredFeedbacks = feedbacks.map(fb => ({
-    ...fb,
-    status: feedbackStatuses[fb.id]
-  })).filter(f => {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const getToken = () => localStorage.getItem('token') || '';
+
+  const getCurrentUser = () => {
+    try {
+      const userStr = localStorage.getItem('currentUser');
+      return userStr ? JSON.parse(userStr) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const fetchFeedbacks = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${API_BASE}/feedbacks`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không thể tải danh sách phản hồi');
+      const data = await res.json();
+      setFeedbacks(data);
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [API_BASE]);
+
+  useEffect(() => {
+    fetchFeedbacks();
+  }, [fetchFeedbacks]);
+
+  // Lọc theo rating (mặc định tất cả đều là 5 sao vì DB không lưu cột rating)
+  const filteredFeedbacks = feedbacks.filter(() => {
     if (ratingFilter === 'all') return true;
-    return f.rating === ratingFilter;
+    return 5 === ratingFilter;
   });
 
-  const unprocessedFeedbacks = filteredFeedbacks.filter(f => f.status === 'unprocessed' || f.status === 'priority');
-  const resolvedFeedbacks = filteredFeedbacks.filter(f => f.status === 'resolved');
+  const unprocessedFeedbacks = filteredFeedbacks.filter(f => f.status === 'pending');
+  const resolvedFeedbacks = filteredFeedbacks.filter(f => f.status === 'responded');
 
   const renderStars = (rating: number) => {
     return (
@@ -116,33 +94,126 @@ export function SupportPage() {
     );
   };
 
-  const updateFeedbackStatus = (feedbackId: string, newStatus: 'unprocessed' | 'priority' | 'resolved') => {
-    setFeedbackStatuses(prev => ({
-      ...prev,
-      [feedbackId]: newStatus
-    }));
-    setStatusDropdownOpen(null);
+  const updateFeedbackStatus = async (feedbackId: number, newStatus: 'pending' | 'responded') => {
+    try {
+      const payload: any = { status: newStatus };
+      if (newStatus === 'pending') {
+        payload.replyContent = null;
+        payload.replierId = null;
+        payload.repliedAt = null;
+      } else {
+        payload.replierId = getCurrentUser()?.id || null;
+      }
+
+      const res = await fetch(`${API_BASE}/feedbacks/${feedbackId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error('Cập nhật trạng thái thất bại');
+      }
+
+      setStatusDropdownOpen(null);
+      fetchFeedbacks();
+
+      // Nếu feedback đang mở trong modal chat, cập nhật thông tin trong modal
+      if (selectedFeedback && selectedFeedback.id === feedbackId) {
+        const updatedRes = await fetch(`${API_BASE}/feedbacks/${feedbackId}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (updatedRes.ok) {
+          const updatedData = await updatedRes.json();
+          setSelectedFeedback(updatedData);
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedFeedback || !replyMessage.trim()) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/feedbacks/${selectedFeedback.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          replyContent: replyMessage.trim(),
+          status: 'responded',
+          replierId: getCurrentUser()?.id || null,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Gửi phản hồi thất bại');
+      }
+
+      setReplyMessage('');
+      fetchFeedbacks();
+
+      // Cập nhật lại feedback đang mở trong modal chat
+      const updatedRes = await fetch(`${API_BASE}/feedbacks/${selectedFeedback.id}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (updatedRes.ok) {
+        const updatedData = await updatedRes.json();
+        setSelectedFeedback(updatedData);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return 'HV';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const FeedbackCard = ({ feedback }: { feedback: Feedback }) => {
-    const currentStatus = feedbackStatuses[feedback.id];
     const isDropdownOpen = statusDropdownOpen === feedback.id;
+    const name = feedback.user?.fullName || 'Hội viên';
+    const initials = getInitials(name);
+    const dateStr = formatDateTime(feedback.createdAt);
 
     return (
       <div className="p-4 bg-[var(--card)] rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-all">
         <div className="flex items-start gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center text-white font-medium text-sm flex-shrink-0">
-            {feedback.avatar}
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <p className="font-medium text-[var(--foreground)] truncate">{feedback.customerName}</p>
-              {renderStars(feedback.rating)}
+              <p className="font-medium text-[var(--foreground)] truncate">{name}</p>
+              {renderStars(5)} {/* Mặc định 5 sao */}
             </div>
-            <p className="text-xs text-[var(--muted-foreground)]">{feedback.date}</p>
+            <p className="text-xs text-[var(--muted-foreground)]">{dateStr}</p>
           </div>
         </div>
-        <p className="text-sm text-[var(--foreground)] line-clamp-3 mb-3">{feedback.message}</p>
+        <p className="text-sm text-[var(--foreground)] line-clamp-3 mb-3">{feedback.content}</p>
 
         {/* Status Tags with Dropdown */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -150,12 +221,12 @@ export function SupportPage() {
             <button
               onClick={() => setStatusDropdownOpen(isDropdownOpen ? null : feedback.id)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                currentStatus === 'resolved'
+                feedback.status === 'responded'
                   ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              {currentStatus === 'resolved' ? 'Đã xử lý' : 'Chưa xử lý'}
+              {feedback.status === 'responded' ? 'Đã xử lý' : 'Chưa xử lý'}
               <ChevronDown className="w-3 h-3" />
             </button>
 
@@ -168,22 +239,15 @@ export function SupportPage() {
                 ></div>
                 <div className="absolute left-0 top-full mt-1 w-48 bg-white border border-[var(--border)] rounded-lg shadow-lg z-20 overflow-hidden">
                   <button
-                    onClick={() => updateFeedbackStatus(feedback.id, 'unprocessed')}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+                    onClick={() => updateFeedbackStatus(feedback.id, 'pending')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 text-slate-700"
                   >
                     <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                     Chưa xử lý
                   </button>
                   <button
-                    onClick={() => updateFeedbackStatus(feedback.id, 'priority')}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                    Ưu tiên xử lý
-                  </button>
-                  <button
-                    onClick={() => updateFeedbackStatus(feedback.id, 'resolved')}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+                    onClick={() => updateFeedbackStatus(feedback.id, 'responded')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors flex items-center gap-2 text-slate-700"
                   >
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     Đã xử lý
@@ -192,17 +256,6 @@ export function SupportPage() {
               </>
             )}
           </div>
-
-          {/* Priority Tag (only shown when status is priority) */}
-          {currentStatus === 'priority' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-              </span>
-              Ưu tiên xử lý
-            </span>
-          )}
         </div>
 
         {/* Comment Button */}
@@ -216,6 +269,30 @@ export function SupportPage() {
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--primary)] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 text-center py-12">
+        <div className="text-red-500 text-5xl mb-4">⚠️</div>
+        <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">Không thể tải dữ liệu</h3>
+        <p className="text-[var(--muted-foreground)] text-sm mb-6">{error}</p>
+        <button
+          onClick={fetchFeedbacks}
+          className="px-6 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors shadow-md"
+        >
+          Tải lại trang
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -246,7 +323,7 @@ export function SupportPage() {
 
       {/* Kanban Board - 2 Columns */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Column 1: Unprocessed (includes unprocessed and priority) */}
+        {/* Column 1: Unprocessed */}
         <div className="space-y-4">
           <div className="bg-slate-100 rounded-lg p-3 border-2 border-slate-200">
             <h3 className="font-bold text-slate-900 flex items-center justify-between">
@@ -301,13 +378,13 @@ export function SupportPage() {
               <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center text-white font-medium text-sm">
-                    {selectedFeedback.avatar}
+                    {getInitials(selectedFeedback.user?.fullName || 'Hội viên')}
                   </div>
                   <div>
-                    <p className="font-medium text-[var(--foreground)]">{selectedFeedback.customerName}</p>
+                    <p className="font-medium text-[var(--foreground)]">{selectedFeedback.user?.fullName || 'Hội viên'}</p>
                     <div className="flex items-center gap-2">
-                      {renderStars(selectedFeedback.rating)}
-                      <span className="text-xs text-[var(--muted-foreground)]">{selectedFeedback.date}</span>
+                      {renderStars(5)}
+                      <span className="text-xs text-[var(--muted-foreground)]">{formatDateTime(selectedFeedback.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -321,31 +398,29 @@ export function SupportPage() {
 
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: '400px' }}>
-                {selectedFeedback.replies && selectedFeedback.replies.length > 0 ? (
-                  selectedFeedback.replies.map((reply, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${reply.from === 'admin' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                          reply.from === 'admin'
-                            ? 'bg-orange-100 text-[var(--foreground)] rounded-br-none'
-                            : 'bg-gray-200 text-[var(--foreground)] rounded-bl-none'
-                        }`}
-                      >
-                        <p className="text-sm">{reply.message}</p>
-                        <p className="text-xs text-[var(--muted-foreground)] mt-1">{reply.time}</p>
+                {/* Tin nhắn từ khách hàng */}
+                <div className="flex justify-start">
+                  <div className="max-w-[70%] bg-gray-200 text-[var(--foreground)] rounded-2xl rounded-bl-none px-4 py-3">
+                    <p className="text-sm">{selectedFeedback.content}</p>
+                    <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                      {formatDateTime(selectedFeedback.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tin nhắn trả lời từ Admin (nếu có) */}
+                {selectedFeedback.replyContent && (
+                  <div className="flex justify-end">
+                    <div className="max-w-[70%] bg-orange-100 text-[var(--foreground)] rounded-2xl rounded-br-none px-4 py-3">
+                      <p className="text-sm">{selectedFeedback.replyContent}</p>
+                      <div className="flex items-center gap-1.5 mt-1 justify-end">
+                        <span className="text-[10px] bg-orange-600 text-white px-1.5 py-0.5 rounded font-medium">
+                          {selectedFeedback.replier?.fullName || 'Admin'}
+                        </span>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          {selectedFeedback.repliedAt ? formatDateTime(selectedFeedback.repliedAt) : ''}
+                        </p>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex justify-start">
-                    <div className="max-w-[70%] bg-gray-200 text-[var(--foreground)] rounded-2xl rounded-bl-none px-4 py-3">
-                      <p className="text-sm">{selectedFeedback.message}</p>
-                      <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                        {selectedFeedback.date.split(' ')[1]}
-                      </p>
                     </div>
                   </div>
                 )}
@@ -363,12 +438,13 @@ export function SupportPage() {
                       onChange={(e) => setReplyMessage(e.target.value)}
                       placeholder="Nhập tin nhắn phản hồi..."
                       rows={3}
-                      disabled={feedbackStatuses[selectedFeedback.id] === 'resolved'}
+                      disabled={selectedFeedback.status === 'responded'}
                       className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                   <button
-                    disabled={feedbackStatuses[selectedFeedback.id] === 'resolved'}
+                    onClick={handleSendReply}
+                    disabled={selectedFeedback.status === 'responded' || !replyMessage.trim()}
                     className="p-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-5 h-5" />

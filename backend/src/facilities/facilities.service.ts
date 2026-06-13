@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Facility } from './entities/facility.entity';
 import { Equipment } from './entities/equipment.entity';
 import { EquipmentReport } from './entities/equipment-report.entity';
+import { GymSetting } from './entities/gym-setting.entity';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
 import { CreateEquipmentReportDto } from './dto/create-equipment-report.dto';
 import { UpdateEquipmentReportDto } from './dto/update-equipment-report.dto';
+import { UpdateGymSettingDto } from './dto/update-gym-setting.dto';
 
 @Injectable()
 export class FacilitiesService {
@@ -20,11 +22,36 @@ export class FacilitiesService {
     private readonly equipmentRepository: Repository<Equipment>,
     @InjectRepository(EquipmentReport)
     private readonly equipmentReportRepository: Repository<EquipmentReport>,
-  ) {}
+    @InjectRepository(GymSetting)
+    private readonly gymSettingRepository: Repository<GymSetting>,
+  ) { }
 
   // ==========================================
   // 1. NGHIỆP VỤ FACILITY (PHÒNG TẬP)
   // ==========================================
+  async getGymSettings() {
+    let settings = await this.gymSettingRepository.findOne({ where: { id: 1 } });
+    if (!settings) {
+      settings = this.gymSettingRepository.create({
+        id: 1,
+        name: 'GymPro Fitness Center',
+        phone: '0281234567',
+        email: 'contact@gympro.vn',
+        address: '123 Nguyễn Huệ, Q.1, TP.HCM',
+        openTime: '06:00',
+        closeTime: '22:00',
+      });
+      await this.gymSettingRepository.save(settings);
+    }
+    return settings;
+  }
+
+  async updateGymSettings(updateGymSettingDto: UpdateGymSettingDto) {
+    const settings = await this.getGymSettings();
+    await this.gymSettingRepository.update(settings.id, updateGymSettingDto);
+    return this.getGymSettings();
+  }
+
   async createFacility(createFacilityDto: CreateFacilityDto) {
     const facility = this.facilityRepository.create(createFacilityDto);
     return this.facilityRepository.save(facility);

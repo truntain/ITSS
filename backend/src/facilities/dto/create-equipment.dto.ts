@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsInt, IsOptional, MaxLength, IsDateString, IsIn } from 'class-validator';
-import type { EquipmentStatus } from '../entities/equipment.entity';
+import type { EquipmentStatus, EquipmentCategory } from '../entities/equipment.entity';
 
 export class CreateEquipmentDto {
   @ApiProperty({ example: 'EQ-001', description: 'Mã thiết bị độc nhất' })
@@ -19,6 +19,11 @@ export class CreateEquipmentDto {
   @IsNotEmpty({ message: 'ID phòng tập không được để trống!' })
   @IsInt({ message: 'ID phòng tập phải là số nguyên!' })
   facilityId: number;
+
+  @ApiProperty({ example: 'Cardio', enum: ['Cardio', 'Strength', 'Classroom', 'Others'] })
+  @IsNotEmpty({ message: 'Loại thiết bị không được để trống!' })
+  @IsIn(['Cardio', 'Strength', 'Classroom', 'Others'], { message: 'Loại thiết bị không hợp lệ!' })
+  category: EquipmentCategory;
 
   @ApiProperty({ example: 'active', enum: ['active', 'maintenance', 'broken'], required: false })
   @IsOptional()

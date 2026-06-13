@@ -696,3 +696,111 @@ CREATE DATABASE "Gympro" WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROV
 
  ALTER TABLE ONLY public.transactions DROP CONSTRAINT fk_transaction_voucher;
 
+-- ==========================================
+-- 1. TẠO KIỂU ENUM MỚI CHO TRẠNG THÁI NHÂN VIÊN
+-- ==========================================
+CREATE TYPE user_status AS ENUM ('working', 'leave', 'quit');
+
+
+-- ==========================================
+-- 2. THÊM CỘT STATUS VÀO BẢNG USERS
+-- ==========================================
+-- Lưu ý: Vì bạn yêu cầu kiểu varchar(50) và check enum, hoặc trực tiếp dùng kiểu ENUM 
+-- Việc dùng trực tiếp kiểu ENUM vừa tạo ở trên là cách chuẩn nhất trong Postgres.
+-- Ràng buộc CHECK sẽ đảm bảo giá trị nằm trong 3 trạng thái này.
+
+ALTER TABLE public.users 
+ADD COLUMN status character varying(50) DEFAULT 'working'::character varying,
+ADD CONSTRAINT users_status_check CHECK (status::text = ANY (ARRAY['working'::text, 'leave'::text, 'quit'::text]));
+
+
+-- ==========================================
+-- 3. ĐỒNG BỘ HÓA LOGIC BẰNG TRIGGER
+-- ==========================================
+
+-- 3.1. Tạo hàm xử lý logic (Trigger Function)
+CREATE OR REPLACE FUNCTION public.sync_user_status_and_active()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Trường hợp 1: Người dùng chủ động cập nhật cột STATUS
+    IF (TG_OP = 'INSERT') OR (OLD.status IS DISTINCT FROM NEW.status) THEN
+        IF NEW.status = 'quit' THEN
+            NEW.is_active := false;
+        ELSIF NEW.status IN ('working', 'leave') AND NEW.is_active = false AND OLD.status = 'quit' THEN
+            -- Nếu từ quit quay lại làm việc thì kích hoạt lại tài khoản
+            NEW.is_active := true;
+        END IF;
+    END IF;
+
+    -- Trường hợp 2: Người dùng chủ động cập nhật cột IS_ACTIVE
+    IF (TG_OP = 'UPDATE') AND (OLD.is_active IS DISTINCT FROM NEW.is_active) THEN
+        -- Nếu chặn active (is_active = false) mà status cũ chưa phải là quit/leave, bạn có thể cân nhắc giữ nguyên hoặc chuyển sang quit.
+        -- Ở đây xử lý logic: nếu chuyển is_active thành true thì status không thể là 'quit' (tự động đưa về 'working')
+        IF NEW.is_active = true AND NEW.status = 'quit' THEN
+            NEW.status := 'working';
+        -- Ngược lại nếu chuyển is_active thành false và status đang là working/leave, tự động đưa về 'quit'
+        ELSIF NEW.is_active = false AND NEW.status = 'working' THEN
+            NEW.status := 'quit';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 3.2. Tạo Trigger gán vào bảng users
+CREATE TRIGGER trg_sync_user_status_active
+BEFORE INSERT OR UPDATE ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_user_status_and_active();
+
+-- ==========================================
+-- 1. KHỞI TẠO KIỂU ENUM MỚI CHO LOẠI THIẾT BỊ
+-- ==========================================
+-- Tạo kiểu ENUM lưu trữ các phân loại thiết bị chính
+CREATE TYPE equipment_category AS ENUM ('Cardio', 'Strength', 'Classroom', 'Others');
+
+
+-- ==========================================
+-- 2. CẬP NHẬT BẢNG EQUIPMENT
+-- ==========================================
+-- Thêm cột category sử dụng kiểu dữ liệu ENUM vừa tạo
+-- Đặt giá trị mặc định (DEFAULT) là 'Others' để các thiết bị hiện tại không bị lỗi dữ liệu
+ALTER TABLE public.equipment 
+ADD COLUMN category equipment_category NOT NULL DEFAULT 'Others';
+
+ALTER TABLE public.facilities
+ADD COLUMN address     TEXT,
+ADD COLUMN phone       VARCHAR(20),
+ADD COLUMN email       VARCHAR(255),
+ADD COLUMN open_time   VARCHAR(10),
+ADD COLUMN close_time  VARCHAR(10);
+
+-- ==========================================
+-- 4. TẠO BẢNG CẤU HÌNH PHÒNG TẬP (GYM SETTINGS)
+-- ==========================================
+CREATE TABLE public.gym_settings (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    phone character varying(20),
+    email character varying(255),
+    address text,
+    open_time character varying(10),
+    close_time character varying(10),
+    CONSTRAINT gym_settings_pkey PRIMARY KEY (id)
+);
+
+INSERT INTO public.gym_settings (id, name, phone, email, address, open_time, close_time)
+VALUES (1, 'GymPro Fitness Center', '0281234567', 'contact@gympro.vn', '123 Nguyễn Huệ, Q.1, TP.HCM', '06:00', '22:00')
+ON CONFLICT (id) DO NOTHING;
+
+-- ==========================================
+-- 5. CẤU HÌNH CASCADE DELETE CHO FACILITIES
+-- ==========================================
+ALTER TABLE public.equipment_reports DROP CONSTRAINT IF EXISTS fk_report_equipment;
+ALTER TABLE public.equipment_reports ADD CONSTRAINT fk_report_equipment FOREIGN KEY (equipment_id) REFERENCES public.equipment(id) ON DELETE CASCADE;
+
+ALTER TABLE public.equipment DROP CONSTRAINT IF EXISTS fk_equipment_facility;
+ALTER TABLE public.equipment ADD CONSTRAINT fk_equipment_facility FOREIGN KEY (facility_id) REFERENCES public.facilities(id) ON DELETE CASCADE;
+
+ALTER TABLE public.gym_settings ADD COLUMN logo TEXT;
