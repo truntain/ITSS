@@ -1,31 +1,102 @@
-"use client";
+﻿"use client";
 
 import { Search, Tag, Check, CreditCard, Banknote, Building2, QrCode, X, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
-// Mock data
-const members = [
-  { id: 'KH001', name: 'Nguyễn Văn An', phone: '0901234567' },
-  { id: 'KH002', name: 'Trần Thị Bình', phone: '0902345678' },
-  { id: 'KH003', name: 'Lê Minh Cường', phone: '0903456789' },
-];
+const API_BASE = 'http://localhost:3001';
 
-const packages = [
-  { id: 'PKG001', name: 'Gói 1 tháng', price: 500000, duration: '30 ngày' },
-  { id: 'PKG002', name: 'Gói 3 tháng', price: 1350000, duration: '90 ngày' },
-  { id: 'PKG003', name: 'Gói 1 năm', price: 4800000, duration: '365 ngày' },
-  { id: 'PKG004', name: 'Gói VIP PT', price: 6000000, duration: '90 ngày + PT' },
-];
+interface Member {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+interface Package {
+  id: string;
+  name: string;
+  price: number;
+  durationMonths: number;
+  duration: string;
+}
 
 export function SalesPage() {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMember, setSelectedMember] = useState('');
   const [selectedPackage, setSelectedPackage] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
+  const [voucherError, setVoucherError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const getToken = () => localStorage.getItem('token') || '';
+
+  const fetchInitialData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const headers = { Authorization: `Bearer ${getToken()}` };
+      
+      const [membersRes, packagesRes, vouchersRes] = await Promise.all([
+        fetch(`${API_BASE}/customers`, { headers }),
+        fetch(`${API_BASE}/memberships/packages`, { headers }),
+        fetch(`${API_BASE}/payments/vouchers`, { headers })
+      ]);
+
+      if (!membersRes.ok || !packagesRes.ok || !vouchersRes.ok) {
+        throw new Error('Không thể tải một số dữ liệu từ máy chủ. Vui lòng kiểm tra quyền truy cập.');
+      }
+
+      const membersData = await membersRes.json();
+      const packagesData = await packagesRes.json();
+      const vouchersData = await vouchersRes.json();
+
+      setMembers(membersData.map((m: any) => ({
+        id: String(m.id),
+        name: m.name || m.fullName || m.email,
+        phone: m.phone || ''
+      })));
+
+      setPackages(packagesData
+        .filter((p: any) => p.isVisible)
+        .map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: Number(p.price),
+          durationMonths: Number(p.durationMonths),
+          duration: `${p.durationMonths} tháng`
+        }))
+      );
+
+      setVouchers(vouchersData);
+    } catch (err: any) {
+      console.error('Lỗi khi tải dữ liệu ban đầu:', err);
+      setError(err.message || 'Có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  useEffect(() => {
+    // Reset voucher discount when package changes to avoid outdated calculations
+    setVoucherCode('');
+    setDiscount(0);
+    setSelectedVoucherId(null);
+    setVoucherError(null);
+  }, [selectedPackage]);
 
   const filteredMembers = members.filter(m =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -36,20 +107,170 @@ export function SalesPage() {
   const selectedPackageData = packages.find(p => p.id === selectedPackage);
 
   const subtotal = selectedPackageData?.price || 0;
-  const total = subtotal - discount;
+  const total = Math.max(0, subtotal - discount);
 
   const handleApplyVoucher = () => {
-    if (voucherCode.toUpperCase() === 'WELCOME10') {
-      setDiscount(subtotal * 0.1);
-    } else if (voucherCode.toUpperCase() === 'VIP20') {
-      setDiscount(subtotal * 0.2);
-    } else {
+    setVoucherError(null);
+    if (!voucherCode.trim()) {
       setDiscount(0);
+      setSelectedVoucherId(null);
+      return;
+    }
+
+    const foundVoucher = vouchers.find(
+      v => v.code.toUpperCase() === voucherCode.trim().toUpperCase()
+    );
+
+    if (!foundVoucher) {
+      setVoucherError('Mã giảm giá không tồn tại!');
+      setDiscount(0);
+      setSelectedVoucherId(null);
+      return;
+    }
+
+    // Kiểm tra tính hợp lệ
+    const now = new Date();
+    const startDate = new Date(foundVoucher.startDate);
+    const endDate = new Date(foundVoucher.endDate);
+    now.setHours(0, 0, 0, 0);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    if (foundVoucher.status !== 'active') {
+      setVoucherError(`Voucher không còn hoạt động (Trạng thái: ${foundVoucher.status})`);
+      setDiscount(0);
+      setSelectedVoucherId(null);
+      return;
+    }
+
+    if (foundVoucher.used >= foundVoucher.total) {
+      setVoucherError('Mã giảm giá đã hết lượt sử dụng!');
+      setDiscount(0);
+      setSelectedVoucherId(null);
+      return;
+    }
+
+    if (now < startDate || now > endDate) {
+      setVoucherError('Mã giảm giá đã hết hạn hoặc chưa đến thời gian áp dụng!');
+      setDiscount(0);
+      setSelectedVoucherId(null);
+      return;
+    }
+
+    // Áp dụng chiết khấu
+    let discountVal = 0;
+    if (foundVoucher.discountType === 'percent') {
+      discountVal = subtotal * (Number(foundVoucher.discountValue) / 100);
+    } else {
+      discountVal = Number(foundVoucher.discountValue);
+    }
+
+    discountVal = Math.min(discountVal, subtotal);
+
+    setDiscount(discountVal);
+    setSelectedVoucherId(foundVoucher.id);
+  };
+
+  const getUserIdFromToken = () => {
+    const token = getToken();
+    if (!token) return undefined;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub;
+    } catch (e) {
+      return undefined;
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!selectedMember || !selectedPackage || !selectedPackageData) return;
+    
+    setSubmitting(true);
+    setError(null);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}`
+      };
+
+      // 1. Tạo Đăng ký gói tập (Membership)
+      const start = new Date();
+      const end = new Date();
+      end.setMonth(start.getMonth() + selectedPackageData.durationMonths);
+
+      const membershipRes = await fetch(`${API_BASE}/memberships`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          userId: parseInt(selectedMember),
+          packageId: selectedPackage,
+          startDate: start.toISOString().split('T')[0],
+          endDate: end.toISOString().split('T')[0],
+          status: 'active'
+        })
+      });
+
+      if (!membershipRes.ok) {
+        const errData = await membershipRes.json();
+        throw new Error(errData.message || 'Đăng ký gói tập thất bại');
+      }
+
+      const createdMembership = await membershipRes.json();
+
+      // 2. Tạo Giao dịch thanh toán (Transaction)
+      const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const receiptNo = `REC_${todayStr}_${Math.floor(1000 + Math.random() * 9000)}`;
+      const cashierId = getUserIdFromToken();
+
+      const paymentMethodMap = {
+        cash: 'Tiền mặt',
+        card: 'Quẹt thẻ',
+        transfer: 'Chuyển khoản'
+      };
+
+      const transactionRes = await fetch(`${API_BASE}/payments/transactions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          receiptNo,
+          userId: parseInt(selectedMember),
+          membershipId: createdMembership.id,
+          packageId: selectedPackage,
+          voucherId: selectedVoucherId || undefined,
+          originalAmount: subtotal,
+          discountAmount: discount,
+          finalAmount: total,
+          paymentMethod: paymentMethodMap[paymentMethod],
+          cashierId: cashierId ? Number(cashierId) : undefined
+        })
+      });
+
+      if (!transactionRes.ok) {
+        const errData = await transactionRes.json();
+        throw new Error(errData.message || 'Tạo giao dịch thanh toán thất bại');
+      }
+
+      // Thành công
+      setShowConfirmModal(false);
+      setShowSuccessModal(true);
+      fetchInitialData();
+    } catch (err: any) {
+      console.error('Lỗi khi xử lý thanh toán:', err);
+      alert(err.message || 'Đã xảy ra lỗi trong quá trình thanh toán');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* Error Alert */}
+      {error && (
+        <div className="lg:col-span-5 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg shadow-sm">
+          {error}
+        </div>
+      )}
+
       {/* Left Side - 60% (3 columns) */}
       <div className="lg:col-span-3 space-y-6">
         {/* Customer Search */}
@@ -152,6 +373,14 @@ export function SalesPage() {
             <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
               <p className="text-sm text-emerald-700">
                 ✓ Áp dụng thành công! Giảm {discount.toLocaleString('vi-VN')}đ
+              </p>
+            </div>
+          )}
+
+          {voucherError && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">
+                ✗ {voucherError}
               </p>
             </div>
           )}
@@ -261,10 +490,10 @@ export function SalesPage() {
           {/* Confirm Button */}
           <button
             onClick={() => setShowConfirmModal(true)}
-            disabled={!selectedMember || !selectedPackage}
+            disabled={!selectedMember || !selectedPackage || submitting || loading}
             className="w-full py-4 bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-bold text-lg transition-colors shadow-md"
           >
-            Xác nhận & Thu tiền
+            {loading ? 'Đang tải dữ liệu...' : submitting ? 'Đang thanh toán...' : 'Xác nhận & Thu tiền'}
           </button>
         </div>
       </div>
@@ -274,7 +503,7 @@ export function SalesPage() {
         <>
           <div
             className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowConfirmModal(false)}
+            onClick={() => !submitting && setShowConfirmModal(false)}
           ></div>
 
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -288,18 +517,17 @@ export function SalesPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 px-4 py-2 bg-white border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] rounded-lg font-medium transition-colors"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 bg-white border border-[var(--border)] hover:bg-[var(--secondary)] text-[var(--foreground)] rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                   Quay lại
                 </button>
                 <button
-                  onClick={() => {
-                    setShowConfirmModal(false);
-                    setShowSuccessModal(true);
-                  }}
-                  className="flex-1 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors"
+                  onClick={handleConfirmPayment}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors disabled:bg-gray-300"
                 >
-                  Chắc chắn
+                  {submitting ? 'Đang xử lý...' : 'Chắc chắn'}
                 </button>
               </div>
             </div>
@@ -334,6 +562,8 @@ export function SalesPage() {
                   setSelectedPackage('');
                   setVoucherCode('');
                   setDiscount(0);
+                  setSelectedVoucherId(null);
+                  setVoucherError(null);
                 }}
                 className="px-6 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors"
               >

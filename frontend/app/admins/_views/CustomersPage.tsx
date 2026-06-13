@@ -1,9 +1,12 @@
-"use client";
+﻿"use client";
 
-import { Search, UserPlus, ChevronRight, AlertCircle, DollarSign, Calendar, X, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { Search, UserPlus, ChevronRight, AlertCircle, DollarSign, Calendar, X, TrendingUp, Check } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Customer {
   id: string;
@@ -18,98 +21,174 @@ interface Customer {
   debt: number;
   lastCheckIn: string;
   bmiHistory: { id: string; month: string; bmi: number }[];
+  checkinHistory?: { date: string; time: string; duration: string }[];
 }
 
-const customers: Customer[] = [
-  {
-    id: 'KH001',
-    name: 'Nguyễn Văn An',
-    email: 'an.nv@email.com',
-    phone: '0901234567',
-    packageName: 'Gói 1 năm',
-    packageExpiry: '15/12/2026',
-    daysLeft: 215,
-    packageDuration: 365,
-    status: 'Active',
-    debt: 0,
-    lastCheckIn: '13/05/2026',
-    bmiHistory: [
-      { id: 'bmi1-1', month: 'T1', bmi: 28.5 },
-      { id: 'bmi1-2', month: 'T2', bmi: 27.2 },
-      { id: 'bmi1-3', month: 'T3', bmi: 26.1 },
-      { id: 'bmi1-4', month: 'T4', bmi: 25.3 },
-      { id: 'bmi1-5', month: 'T5', bmi: 24.8 },
-    ]
-  },
-  {
-    id: 'KH002',
-    name: 'Trần Thị Bình',
-    email: 'binh.tt@email.com',
-    phone: '0902345678',
-    packageName: 'Gói 3 tháng',
-    packageExpiry: '20/05/2026',
-    daysLeft: 6,
-    packageDuration: 90,
-    status: 'Expiring',
-    debt: 0,
-    lastCheckIn: '12/05/2026',
-    bmiHistory: [
-      { id: 'bmi2-1', month: 'T1', bmi: 24.2 },
-      { id: 'bmi2-2', month: 'T2', bmi: 23.8 },
-      { id: 'bmi2-3', month: 'T3', bmi: 23.5 },
-      { id: 'bmi2-4', month: 'T4', bmi: 23.1 },
-      { id: 'bmi2-5', month: 'T5', bmi: 22.9 },
-    ]
-  },
-  {
-    id: 'KH003',
-    name: 'Lê Minh Cường',
-    email: 'cuong.lm@email.com',
-    phone: '0903456789',
-    packageName: 'Gói 1 tháng',
-    packageExpiry: '10/05/2026',
-    daysLeft: -4,
-    packageDuration: 30,
-    status: 'Expired',
-    debt: 500000,
-    lastCheckIn: '25/04/2026',
-    bmiHistory: [
-      { id: 'bmi3-1', month: 'T1', bmi: 26.8 },
-      { id: 'bmi3-2', month: 'T2', bmi: 26.5 },
-      { id: 'bmi3-3', month: 'T3', bmi: 26.2 },
-      { id: 'bmi3-4', month: 'T4', bmi: 25.9 },
-      { id: 'bmi3-5', month: 'T5', bmi: 25.6 },
-    ]
-  },
-  {
-    id: 'KH004',
-    name: 'Phạm Thu Dung',
-    email: 'dung.pt@email.com',
-    phone: '0904567890',
-    packageName: 'Gói VIP',
-    packageExpiry: '18/05/2026',
-    daysLeft: 4,
-    packageDuration: 90,
-    status: 'Expiring',
-    debt: 0,
-    lastCheckIn: '01/05/2026',
-    bmiHistory: [
-      { id: 'bmi4-1', month: 'T1', bmi: 22.5 },
-      { id: 'bmi4-2', month: 'T2', bmi: 22.0 },
-      { id: 'bmi4-3', month: 'T3', bmi: 21.8 },
-      { id: 'bmi4-4', month: 'T4', bmi: 21.5 },
-      { id: 'bmi4-5', month: 'T5', bmi: 21.2 },
-    ]
-  },
-];
-
 export function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'expiring' | 'debt' | 'inactive'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('Thêm hội viên thành công!');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    gender: 'male' as 'male' | 'female' | 'other',
+    birthDate: '',
+    height: '',
+    packageId: '',
+  });
+  const [formErrors, setFormErrors] = useState({
+    name: false,
+    email: false,
+    phone: false,
+    packageId: false,
+  });
+
+  const fetchCustomers = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/customers`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+          }
+          if (res.status === 403) {
+            throw new Error('Bạn không có quyền truy cập vào dữ liệu này (Chỉ dành cho Admin).');
+          }
+          throw new Error('Không thể tải danh sách khách hàng từ máy chủ.');
+        }
+        return res.json();
+      })
+      .then(data => {
+        setCustomers(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching customers:', err);
+        setError(err.message || 'Có lỗi xảy ra khi kết nối máy chủ');
+        setLoading(false);
+      });
+  }, []);
+
+  const fetchPackages = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/memberships/packages`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể tải danh sách gói tập');
+        return res.json();
+      })
+      .then(data => {
+        setPackages(data.filter((p: any) => p.isVisible));
+      })
+      .catch(err => console.error('Error fetching packages:', err));
+  }, []);
+
+  useEffect(() => {
+    fetchCustomers();
+    fetchPackages();
+  }, [fetchCustomers, fetchPackages]);
+
+  const handleViewDetails = (customerId: string) => {
+    setDetailLoading(true);
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/customers/${customerId}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể tải thông tin chi tiết hội viên');
+        return res.json();
+      })
+      .then(data => {
+        setSelectedCustomer(data);
+        setDetailLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        alert(err.message || 'Có lỗi xảy ra');
+        setDetailLoading(false);
+      });
+  };
+
+  const handleAddCustomer = () => {
+    const errors = {
+      name: !formData.name.trim(),
+      email: !formData.email.trim() || !formData.email.includes('@'),
+      phone: !formData.phone.trim(),
+      packageId: !formData.packageId,
+    };
+
+    setFormErrors(errors);
+
+    if (Object.values(errors).some(error => error)) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/customers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        fullName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        gender: formData.gender,
+        birthDate: formData.birthDate || undefined,
+        height: formData.height ? Number(formData.height) : undefined,
+        packageId: formData.packageId,
+      }),
+    })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(errData => {
+            throw new Error(errData.message || 'Thêm hội viên thất bại');
+          });
+        }
+        return res.json();
+      })
+      .then(() => {
+        fetchCustomers();
+        setShowAddModal(false);
+
+        // Reset form
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          gender: 'male',
+          birthDate: '',
+          height: '',
+          packageId: '',
+        });
+        setFormErrors({ name: false, email: false, phone: false, packageId: false });
+
+        setNotificationMessage('Thêm hội viên thành công!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+      })
+      .catch(err => {
+        console.error('Lỗi khi thêm hội viên:', err);
+        alert(err.message || 'Có lỗi xảy ra');
+      });
+  };
 
   const filteredCustomers = customers.filter(customer => {
     const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,6 +218,47 @@ export function CustomersPage() {
     if (daysLeft < 0) return 0;
     return Math.min((daysLeft / duration) * 100, 100);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-pulse p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 bg-gray-200 rounded w-48"></div>
+            <div className="h-4 bg-gray-200 rounded w-64"></div>
+          </div>
+          <div className="h-10 bg-gray-200 rounded w-32"></div>
+        </div>
+        <div className="h-12 bg-gray-200 rounded-lg w-full max-w-md"></div>
+        <div className="bg-white rounded-lg border border-[var(--border)] shadow-sm h-64 flex items-center justify-center">
+          <div className="text-[var(--muted-foreground)]">Đang tải danh sách hội viên...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center max-w-md mx-auto my-12">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h3 className="text-xl font-bold text-red-950 mb-2">Không thể tải dữ liệu</h3>
+          <p className="text-red-700 text-sm mb-6">{error}</p>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              fetchCustomers();
+              fetchPackages();
+            }}
+            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors shadow-md"
+          >
+            Tải lại trang
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -290,10 +410,11 @@ export function CustomersPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <button
-                      onClick={() => setSelectedCustomer(customer)}
-                      className="inline-flex items-center gap-1 text-[var(--primary)] hover:text-[#E66E00] text-sm font-medium transition-colors"
+                      onClick={() => handleViewDetails(customer.id)}
+                      disabled={detailLoading}
+                      className="inline-flex items-center gap-1 text-[var(--primary)] hover:text-[#E66E00] text-sm font-medium transition-colors disabled:opacity-50"
                     >
-                      Xem chi tiết
+                      {detailLoading && selectedCustomer?.id === customer.id ? 'Đang tải...' : 'Xem chi tiết'}
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </td>
@@ -367,61 +488,68 @@ export function CustomersPage() {
                     <TrendingUp className="w-5 h-5 text-[var(--primary)]" />
                     <h4 className="text-lg font-bold text-[var(--foreground)]">Biểu đồ chỉ số BMI</h4>
                   </div>
-                  <div className="bg-[var(--background)] rounded-lg p-4 border border-[var(--border)]">
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart
-                        data={selectedCustomer.bmiHistory}
-                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                        <XAxis
-                          dataKey="month"
-                          stroke="#64748B"
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis
-                          stroke="#64748B"
-                          tick={{ fontSize: 12 }}
-                          domain={[20, 30]}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #E2E8F0',
-                            borderRadius: '8px'
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="bmi"
-                          stroke="#FF7A00"
-                          strokeWidth={3}
-                          dot={{ r: 5, fill: '#FF7A00' }}
-                          name="BMI"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {selectedCustomer.bmiHistory && selectedCustomer.bmiHistory.length > 0 ? (
+                    <div className="bg-[var(--background)] rounded-lg p-4 border border-[var(--border)]">
+                      <ResponsiveContainer width="100%" height={250}>
+                        <LineChart
+                          data={selectedCustomer.bmiHistory}
+                          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                          <XAxis
+                            dataKey="month"
+                            stroke="#64748B"
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis
+                            stroke="#64748B"
+                            tick={{ fontSize: 12 }}
+                            domain={[15, 35]}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'white',
+                              border: '1px solid #E2E8F0',
+                              borderRadius: '8px'
+                            }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="bmi"
+                            stroke="#FF7A00"
+                            strokeWidth={3}
+                            dot={{ r: 5, fill: '#FF7A00' }}
+                            name="BMI"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-[var(--muted-foreground)] border border-dashed border-[var(--border)] rounded-lg bg-[var(--card)]">
+                      Chưa có dữ liệu chỉ số BMI (Cần cập nhật Chiều cao & Cân nặng của hội viên).
+                    </div>
+                  )}
                 </div>
 
                 {/* Check-in History */}
                 <div>
                   <h4 className="text-lg font-bold text-[var(--foreground)] mb-4">Lịch sử Check-in gần đây</h4>
                   <div className="space-y-2">
-                    {[
-                      { date: '13/05/2026', time: '18:30', duration: '2h 15p' },
-                      { date: '11/05/2026', time: '19:00', duration: '1h 45p' },
-                      { date: '09/05/2026', time: '18:15', duration: '2h 30p' },
-                      { date: '07/05/2026', time: '17:45', duration: '2h 00p' },
-                    ].map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg border border-[var(--border)]">
-                        <div>
-                          <p className="font-medium text-[var(--foreground)]">{item.date}</p>
-                          <p className="text-sm text-[var(--muted-foreground)]">Check-in: {item.time}</p>
+                    {selectedCustomer.checkinHistory && selectedCustomer.checkinHistory.length > 0 ? (
+                      selectedCustomer.checkinHistory.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                          <div>
+                            <p className="font-medium text-[var(--foreground)]">{item.date}</p>
+                            <p className="text-sm text-[var(--muted-foreground)]">Check-in: {item.time}</p>
+                          </div>
+                          <span className="text-sm font-medium text-[var(--primary)]">{item.duration}</span>
                         </div>
-                        <span className="text-sm font-medium text-[var(--primary)]">{item.duration}</span>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-[var(--muted-foreground)] border border-dashed border-[var(--border)] rounded-lg">
+                        Chưa có lịch sử check-in.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               </div>
@@ -452,41 +580,127 @@ export function CustomersPage() {
               </div>
 
               {/* Form */}
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                    Họ và tên
+                    Họ và tên <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     placeholder="VD: Nguyễn Văn A"
-                    className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                    value={formData.name}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      setFormErrors({ ...formErrors, name: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.name ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
                   />
+                  {formErrors.name && <p className="text-xs text-red-500 mt-1">Vui lòng nhập họ và tên</p>}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                    Số điện thoại
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="VD: email@gmail.com"
+                    value={formData.email}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setFormErrors({ ...formErrors, email: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.email ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.email && <p className="text-xs text-red-500 mt-1">Vui lòng nhập email hợp lệ</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Số điện thoại <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     placeholder="VD: 0901234567"
-                    className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({ ...formData, phone: e.target.value });
+                      setFormErrors({ ...formErrors, phone: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.phone ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.phone && <p className="text-xs text-red-500 mt-1">Vui lòng nhập số điện thoại</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                      Giới tính
+                    </label>
+                    <select
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
+                      className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    >
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                      Chiều cao (cm)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="VD: 170"
+                      value={formData.height}
+                      onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                      className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Ngày sinh
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                    className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                    Gói tập
+                    Gói tập <span className="text-red-500">*</span>
                   </label>
-                  <select className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent">
+                  <select
+                    value={formData.packageId}
+                    onChange={(e) => {
+                      setFormData({ ...formData, packageId: e.target.value });
+                      setFormErrors({ ...formErrors, packageId: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.packageId ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  >
                     <option value="">-- Chọn gói tập --</option>
-                    <option value="Gói 1 tháng">Gói 1 tháng</option>
-                    <option value="Gói 3 tháng">Gói 3 tháng</option>
-                    <option value="Gói 6 tháng">Gói 6 tháng</option>
-                    <option value="Gói 1 năm">Gói 1 năm</option>
-                    <option value="Gói VIP">Gói VIP</option>
+                    {packages.map((pkg) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.name} ({Number(pkg.price).toLocaleString('vi-VN')}đ)
+                      </option>
+                    ))}
                   </select>
+                  {formErrors.packageId && <p className="text-xs text-red-500 mt-1">Vui lòng chọn gói tập</p>}
                 </div>
               </div>
 
@@ -498,7 +712,10 @@ export function CustomersPage() {
                 >
                   Hủy
                 </button>
-                <button className="px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors">
+                <button
+                  onClick={handleAddCustomer}
+                  className="px-4 py-2 bg-[#FF7A00] hover:bg-[#E66D00] text-white rounded-lg font-medium transition-colors"
+                >
                   Lưu
                 </button>
               </div>
@@ -506,6 +723,24 @@ export function CustomersPage() {
           </div>
         </>
       )}
+
+      {/* Success Notification */}
+      {showSuccessNotification && (
+        <div className="fixed top-4 right-4 z-50 bg-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-fadeIn">
+          <Check className="w-5 h-5" />
+          <span className="font-medium">{notificationMessage}</span>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

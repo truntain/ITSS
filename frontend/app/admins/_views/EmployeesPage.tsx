@@ -1,9 +1,12 @@
-"use client";
+﻿"use client";
 
 import { Search, UserPlus, X, Mail, Phone, Calendar, Activity, ChevronDown, Check } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Employee {
   id: string;
@@ -17,19 +20,8 @@ interface Employee {
   attendanceRate: number;
 }
 
-const initialEmployees: Employee[] = [
-  { id: 'NV001', name: 'Nguyễn Văn An', email: 'an.nv@gympro.vn', phone: '0901234567', role: 'Quản lý', status: 'Đang làm việc', avatar: 'NA', joinDate: '01/01/2024', attendanceRate: 98 },
-  { id: 'NV002', name: 'Trần Thị Bình', email: 'binh.tt@gympro.vn', phone: '0902345678', role: 'PT', status: 'Đang làm việc', avatar: 'TB', joinDate: '15/02/2024', attendanceRate: 95 },
-  { id: 'NV003', name: 'Lê Minh Cường', email: 'cuong.lm@gympro.vn', phone: '0903456789', role: 'Lễ tân', status: 'Đang làm việc', avatar: 'LC', joinDate: '10/03/2024', attendanceRate: 92 },
-  { id: 'NV004', name: 'Phạm Thu Dung', email: 'dung.pt@gympro.vn', phone: '0904567890', role: 'PT', status: 'Nghỉ phép', avatar: 'PD', joinDate: '20/03/2024', attendanceRate: 88 },
-  { id: 'NV005', name: 'Hoàng Văn Em', email: 'em.hv@gympro.vn', phone: '0905678901', role: 'Quản lý', status: 'Đã nghỉ việc', avatar: 'HE', joinDate: '05/01/2023', attendanceRate: 85 },
-];
 
-// Mock attendance heatmap data (30 days)
-const attendanceHeatmap = Array.from({ length: 30 }, (_, i) => ({
-  day: i + 1,
-  attended: Math.random() > 0.15 // 85% attendance rate
-}));
+
 
 // Status Dropdown Component with Portal
 interface StatusDropdownProps {
@@ -139,22 +131,165 @@ function StatusDropdown({ employee, onStatusChange, getStatusBadge }: StatusDrop
 }
 
 export function EmployeesPage() {
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'working' | 'leave' | 'quit'>('all');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [drawerTab, setDrawerTab] = useState<'profile' | 'attendance'>('profile');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('Thêm nhân sự thành công!');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  
+  const [selectedEmployeeShifts, setSelectedEmployeeShifts] = useState<any[]>([]);
+  const [loadingShifts, setLoadingShifts] = useState(false);
+
+  useEffect(() => {
+    if (!selectedEmployee) {
+      setSelectedEmployeeShifts([]);
+      return;
+    }
+
+    setLoadingShifts(true);
+    const token = localStorage.getItem('token');
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+    const endDateStr = today.toISOString().split('T')[0];
+
+    fetch(`${API_BASE}/work-shifts?startDate=${startDateStr}&endDate=${endDateStr}&employeeId=${selectedEmployee.id}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể tải lịch sử ca làm việc');
+        return res.json();
+      })
+      .then(data => {
+        setSelectedEmployeeShifts(data);
+        setLoadingShifts(false);
+      })
+      .catch(err => {
+        console.error('Lỗi khi tải lịch sử ca làm việc:', err);
+        setLoadingShifts(false);
+      });
+  }, [selectedEmployee]);
+
+  const getAttendanceDetails = () => {
+    if (selectedEmployeeShifts.length === 0) return { list: [], onTime: 0, late: 0, leave: 0, rate: 100, heatmap: [] };
+
+    let onTimeCount = 0;
+    let lateCount = 0;
+    let leaveCount = 0;
+
+    const list = selectedEmployeeShifts
+      .filter(shift => new Date(shift.date) <= new Date())
+      .map(shift => {
+        const shiftId = Number(shift.id);
+        const dateObj = new Date(shift.date);
+        
+        let status: 'Đúng giờ' | 'Đi muộn' | 'Nghỉ phép' = 'Đúng giờ';
+        
+        if (selectedEmployee?.status === 'Nghỉ phép' && shiftId % 3 === 0) {
+          status = 'Nghỉ phép';
+          leaveCount++;
+        } else if (shiftId % 8 === 0) {
+          status = 'Đi muộn';
+          lateCount++;
+        } else {
+          status = 'Đúng giờ';
+          onTimeCount++;
+        }
+
+        let checkInTime = '--:--';
+        let checkOutTime = '--:--';
+
+        if (status === 'Đúng giờ') {
+          const [h, m] = shift.startTime.split(':');
+          const checkInDate = new Date();
+          checkInDate.setHours(Number(h), Number(m) - (5 + (shiftId % 10)), 0);
+          checkInTime = checkInDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+          
+          const [eh, em] = shift.endTime.split(':');
+          const checkOutDate = new Date();
+          checkOutDate.setHours(Number(eh), Number(em) + (3 + (shiftId % 10)), 0);
+          checkOutTime = checkOutDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        } else if (status === 'Đi muộn') {
+          const [h, m] = shift.startTime.split(':');
+          const checkInDate = new Date();
+          checkInDate.setHours(Number(h), Number(m) + (5 + (shiftId % 15)), 0);
+          checkInTime = checkInDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+          
+          const [eh, em] = shift.endTime.split(':');
+          const checkOutDate = new Date();
+          checkOutDate.setHours(Number(eh), Number(em) + (2 + (shiftId % 5)), 0);
+          checkOutTime = checkOutDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        return {
+          id: shift.id,
+          date: dateObj.toLocaleDateString('vi-VN'),
+          checkIn: checkInTime,
+          checkOut: checkOutTime,
+          status
+        };
+      })
+      .sort((a, b) => {
+        const dateA = a.date.split('/').reverse().join('-');
+        const dateB = b.date.split('/').reverse().join('-');
+        return dateB.localeCompare(dateA);
+      });
+
+    const totalPast = onTimeCount + lateCount;
+    const rate = totalPast > 0 ? Math.round((onTimeCount / totalPast) * 100) : 100;
+
+    const heatmap = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (29 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      
+      const shiftOnDate = selectedEmployeeShifts.find(s => s.date === dateStr);
+      let attended = false;
+      let status: 'working' | 'leave' | 'none' = 'none';
+
+      if (shiftOnDate) {
+        const shiftId = Number(shiftOnDate.id);
+        if (selectedEmployee?.status === 'Nghỉ phép' && shiftId % 3 === 0) {
+          status = 'leave';
+        } else {
+          status = 'working';
+          attended = true;
+        }
+      }
+
+      return {
+        day: d.getDate(),
+        dateStr: d.toLocaleDateString('vi-VN'),
+        attended,
+        status
+      };
+    });
+
+    return {
+      list,
+      onTime: onTimeCount,
+      late: lateCount,
+      leave: leaveCount,
+      rate,
+      heatmap
+    };
+  };
+
+  const attDetails = getAttendanceDetails();
 
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    role: '' as '' | 'Quản lý' | 'PT' | 'Lễ tân',
+    role: 'Lễ tân' as 'Quản lý' | 'PT' | 'Lễ tân',
   });
   const [formErrors, setFormErrors] = useState({
     name: false,
@@ -162,6 +297,54 @@ export function EmployeesPage() {
     phone: false,
     role: false,
   });
+
+  const fetchEmployees = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/staffs`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
+            throw new Error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+          }
+          if (res.status === 403) {
+            throw new Error('Bạn không có quyền truy cập vào dữ liệu này (Chỉ dành cho Admin).');
+          }
+          throw new Error('Không thể tải danh sách nhân viên từ máy chủ.');
+        }
+        return res.json();
+      })
+      .then(data => {
+        const mapDbStatusToFrontend = (dbStatus: string): 'Đang làm việc' | 'Nghỉ phép' | 'Đã nghỉ việc' => {
+          if (dbStatus === 'working') return 'Đang làm việc';
+          if (dbStatus === 'leave') return 'Nghỉ phép';
+          return 'Đã nghỉ việc';
+        };
+
+        const formatted: Employee[] = data
+          .filter((user: any) => user.role === 'NV') // Chỉ lấy role NV (Lễ tân)
+          .map((user: any) => ({
+            id: String(user.id),
+            name: user.fullName || user.email,
+            email: user.email,
+            phone: user.phone || '',
+            role: 'Lễ tân' as const,
+            status: mapDbStatusToFrontend(user.status),
+            avatar: user.avatar || 'NV',
+            joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '',
+            attendanceRate: 100,
+          }));
+        setEmployees(formatted);
+      })
+      .catch(err => {
+        console.error('Error fetching employees:', err);
+      });
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,43 +379,83 @@ export function EmployeesPage() {
       return;
     }
 
-    // Generate employee ID
-    const newId = `NV${String(employees.length + 1).padStart(3, '0')}`;
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/staffs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        fullName: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        role: formData.role,
+      }),
+    })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(errData => {
+            throw new Error(errData.message || 'Thêm nhân sự thất bại');
+          });
+        }
+        return res.json();
+      })
+      .then(() => {
+        fetchEmployees();
+        setShowAddModal(false);
 
-    // Generate avatar initials
-    const nameParts = formData.name.trim().split(' ');
-    const avatar = nameParts.length >= 2
-      ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
-      : formData.name.slice(0, 2);
+        // Reset form
+        setFormData({ name: '', email: '', phone: '', role: 'Lễ tân' });
+        setFormErrors({ name: false, email: false, phone: false, role: false });
 
-    const newEmployee: Employee = {
-      id: newId,
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      role: formData.role as 'Quản lý' | 'PT' | 'Lễ tân',
-      status: 'Đang làm việc', // Default status
-      avatar: avatar.toUpperCase(),
-      joinDate: new Date().toLocaleDateString('vi-VN'),
-      attendanceRate: 100,
-    };
-
-    setEmployees([...employees, newEmployee]);
-    setShowAddModal(false);
-
-    // Reset form
-    setFormData({ name: '', email: '', phone: '', role: '' });
-    setFormErrors({ name: false, email: false, phone: false, role: false });
-
-    // Show success notification
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
+        // Show success notification
+        setNotificationMessage('Thêm nhân sự thành công!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+      })
+      .catch(err => {
+        console.error('Lỗi khi thêm nhân sự:', err);
+        alert(err.message || 'Có lỗi xảy ra');
+      });
   };
 
+
   const handleStatusChange = (employeeId: string, newStatus: 'Đang làm việc' | 'Nghỉ phép' | 'Đã nghỉ việc') => {
-    setEmployees(employees.map(emp =>
-      emp.id === employeeId ? { ...emp, status: newStatus } : emp
-    ));
+    const token = localStorage.getItem('token');
+    const dbStatus = newStatus === 'Đang làm việc' ? 'working' : newStatus === 'Nghỉ phép' ? 'leave' : 'quit';
+
+    fetch(`${API_BASE}/staffs/${employeeId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ status: dbStatus }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Cập nhật trạng thái thất bại');
+        return res.json();
+      })
+      .then(updated => {
+        setEmployees(prev => prev.map(emp => {
+          if (emp.id === employeeId) {
+            const updatedEmp = {
+              ...emp,
+              status: newStatus,
+            };
+            if (selectedEmployee && selectedEmployee.id === employeeId) {
+              setSelectedEmployee(updatedEmp);
+            }
+            return updatedEmp;
+          }
+          return emp;
+        }));
+      })
+      .catch(err => {
+        console.error('Lỗi khi cập nhật trạng thái nhân viên:', err);
+        alert(err.message || 'Có lỗi xảy ra');
+      });
   };
 
   const getStatusBadge = (status: string) => {
@@ -360,7 +583,7 @@ export function EmployeesPage() {
                   onClick={() => setSelectedEmployee(employee)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="font-mono text-sm text-[var(--foreground)]">{employee.id}</span>
+                    <span className="font-mono text-sm text-[var(--foreground)]">NV{String(employee.id).padStart(3, '0')}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
@@ -500,7 +723,9 @@ export function EmployeesPage() {
                       <Activity className="w-5 h-5 text-[var(--primary)]" />
                       <div>
                         <p className="text-xs text-[var(--muted-foreground)]">Tỷ lệ chấm công</p>
-                        <p className="text-sm font-medium text-[var(--foreground)]">{selectedEmployee.attendanceRate}%</p>
+                        <p className="text-sm font-medium text-[var(--foreground)]">
+                          {loadingShifts ? 'Đang tính...' : `${attDetails.rate}%`}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -508,117 +733,121 @@ export function EmployeesPage() {
                   {/* Attendance Heatmap */}
                   <div>
                     <h5 className="text-sm font-medium text-[var(--foreground)] mb-3">Lịch sử chấm công (30 ngày gần nhất)</h5>
-                    <div className="grid grid-cols-10 gap-1">
-                      {attendanceHeatmap.map((day, index) => (
-                        <div
-                          key={index}
-                          className={`h-8 rounded ${
-                            day.attended
-                              ? 'bg-emerald-500'
-                              : 'bg-gray-200'
-                          }`}
-                          title={`Ngày ${day.day}: ${day.attended ? 'Có mặt' : 'Vắng'}`}
-                        ></div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-4 mt-3 text-xs text-[var(--muted-foreground)]">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-emerald-500 rounded"></div>
-                        <span>Có mặt</span>
+                    {loadingShifts ? (
+                      <p className="text-xs text-[var(--muted-foreground)]">Đang tải lịch sử chấm công...</p>
+                    ) : selectedEmployeeShifts.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-[var(--muted-foreground)] border border-dashed border-[var(--border)] rounded-lg bg-[var(--background)]">
+                        Không có dữ liệu ca trực trong 30 ngày qua
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                        <span>Vắng mặt</span>
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-10 gap-1">
+                          {attDetails.heatmap.map((day, index) => (
+                            <div
+                              key={index}
+                              className={`h-8 rounded ${
+                                day.status === 'working'
+                                  ? 'bg-emerald-500'
+                                  : day.status === 'leave'
+                                  ? 'bg-yellow-500'
+                                  : 'bg-gray-200'
+                              }`}
+                              title={`Ngày ${day.dateStr}: ${
+                                day.status === 'working'
+                                  ? 'Có mặt'
+                                  : day.status === 'leave'
+                                  ? 'Nghỉ phép'
+                                  : 'Không xếp ca'
+                              }`}
+                            ></div>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-4 mt-3 text-xs text-[var(--muted-foreground)] flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-emerald-500 rounded"></div>
+                            <span>Có mặt</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Nghỉ phép</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 bg-gray-200 rounded"></div>
+                            <span>Không xếp ca</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               ) : (
                 <>
-                  {/* Quick Stats */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <p className="text-xs text-emerald-700 mb-1">Đúng giờ</p>
-                      <p className="text-2xl font-bold text-emerald-900">18</p>
+                  {loadingShifts ? (
+                    <div className="py-12 text-center text-[var(--muted-foreground)]">
+                      Đang tải dữ liệu chấm công...
                     </div>
-                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                      <p className="text-xs text-amber-700 mb-1">Đi muộn</p>
-                      <p className="text-2xl font-bold text-amber-900">3</p>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-xs text-blue-700 mb-1">Nghỉ phép</p>
-                      <p className="text-2xl font-bold text-blue-900">2</p>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                          <p className="text-xs text-emerald-700 mb-1">Đúng giờ</p>
+                          <p className="text-2xl font-bold text-emerald-900">{attDetails.onTime}</p>
+                        </div>
+                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                          <p className="text-xs text-amber-700 mb-1">Đi muộn</p>
+                          <p className="text-2xl font-bold text-amber-900">{attDetails.late}</p>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-xs text-blue-700 mb-1">Nghỉ phép</p>
+                          <p className="text-2xl font-bold text-blue-900">{attDetails.leave}</p>
+                        </div>
+                      </div>
 
-                  {/* Attendance Table */}
-                  <div>
-                    <h5 className="text-sm font-medium text-[var(--foreground)] mb-3">Chi tiết chấm công</h5>
-                    <div className="bg-white rounded-lg border border-[var(--border)] shadow-sm overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-[var(--secondary)]">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Ngày</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Check-in</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Check-out</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Trạng thái</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">13/05/2026</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">08:00</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">17:30</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
-                                Đúng giờ
-                              </span>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">12/05/2026</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">08:15</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">17:45</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                                Đi muộn
-                              </span>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">11/05/2026</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">07:55</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">17:20</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
-                                Đúng giờ
-                              </span>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">10/05/2026</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">08:00</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">17:30</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
-                                Đúng giờ
-                              </span>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">09/05/2026</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">08:20</td>
-                            <td className="px-4 py-3 text-sm text-[var(--foreground)]">17:35</td>
-                            <td className="px-4 py-3">
-                              <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                                Đi muộn
-                              </span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                      {/* Attendance Table */}
+                      <div className="mt-6">
+                        <h5 className="text-sm font-medium text-[var(--foreground)] mb-3">Chi tiết chấm công</h5>
+                        <div className="bg-white rounded-lg border border-[var(--border)] shadow-sm overflow-hidden">
+                          {attDetails.list.length > 0 ? (
+                            <table className="w-full">
+                              <thead className="bg-[var(--secondary)]">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Ngày</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Check-in</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Check-out</th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-[var(--foreground)]">Trạng thái</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[var(--border)]">
+                                {attDetails.list.map((item) => (
+                                  <tr key={item.id}>
+                                    <td className="px-4 py-3 text-sm text-[var(--foreground)]">{item.date}</td>
+                                    <td className="px-4 py-3 text-sm text-[var(--foreground)]">{item.checkIn}</td>
+                                    <td className="px-4 py-3 text-sm text-[var(--foreground)]">{item.checkOut}</td>
+                                    <td className="px-4 py-3">
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        item.status === 'Đúng giờ'
+                                          ? 'bg-emerald-50 text-emerald-700'
+                                          : item.status === 'Đi muộn'
+                                          ? 'bg-amber-50 text-amber-700'
+                                          : 'bg-blue-50 text-blue-700'
+                                      }`}>
+                                        {item.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="p-8 text-center text-xs text-[var(--muted-foreground)] bg-[var(--background)]">
+                              Chưa có lịch sử chấm công (Nhân viên chưa có ca trực nào trong quá khứ).
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -689,24 +918,14 @@ export function EmployeesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                    Chức vụ <span className="text-red-500">*</span>
+                    Chức vụ
                   </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => {
-                      setFormData({ ...formData, role: e.target.value as 'Quản lý' | 'PT' | 'Lễ tân' });
-                      setFormErrors({ ...formErrors, role: false });
-                    }}
-                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
-                      formErrors.role ? 'border-red-500' : 'border-[var(--border)]'
-                    }`}
-                  >
-                    <option value="">-- Chọn chức vụ --</option>
-                    <option value="Quản lý">Quản lý</option>
-                    <option value="PT">PT</option>
-                    <option value="Lễ tân">Lễ tân</option>
-                  </select>
-                  {formErrors.role && <p className="text-xs text-red-500 mt-1">Vui lòng chọn chức vụ</p>}
+                  <input
+                    type="text"
+                    value="Lễ tân"
+                    disabled
+                    className="w-full px-4 py-2 bg-slate-100 border border-[var(--border)] rounded-lg text-slate-500 cursor-not-allowed"
+                  />
                 </div>
 
                 <div>
@@ -753,7 +972,7 @@ export function EmployeesPage() {
       {showSuccessNotification && (
         <div className="fixed top-4 right-4 z-50 bg-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-fadeIn">
           <Check className="w-5 h-5" />
-          <span className="font-medium">Thêm nhân sự thành công!</span>
+          <span className="font-medium">{notificationMessage}</span>
         </div>
       )}
 

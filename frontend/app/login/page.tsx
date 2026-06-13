@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,7 @@ export default function LoginPage() {
 
     if (!errors.email && !errors.password) {
       try {
-        const response = await fetch('http://localhost:3001/auth/login', {
+        const response = await fetch(`${'http://localhost:3001'}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

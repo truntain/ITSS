@@ -1,44 +1,57 @@
-"use client";
+﻿"use client";
 
 import { Dumbbell, AlertTriangle, Wrench, X, Camera, Plus, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Equipment {
   id: string;
+  dbId?: number;
   name: string;
-  category: string;
+  category: 'Cardio' | 'Strength' | 'Classroom' | 'Others';
   image: string;
   status: 'available' | 'maintenance';
   location: string;
   lastMaintenance: string;
-  priority?: 'normal' | 'urgent';
   issueDescription?: string;
-  issueImage?: string;
+  activeReportId?: number;
 }
 
-const initialEquipments: Equipment[] = [
-  { id: 'EQ001', name: 'Máy chạy bộ Impulse PT300', category: 'Cardio', image: '🏃', status: 'available', location: 'Khu Cardio A', lastMaintenance: '01/04/2026' },
-  { id: 'EQ002', name: 'Ghế tập ngực đa năng', category: 'Tạ & Sức mạnh', image: '💪', status: 'available', location: 'Khu Tạ B', lastMaintenance: '15/03/2026' },
-  { id: 'EQ003', name: 'Xe đạp Spin Bike S500', category: 'Cardio', image: '🚴', status: 'maintenance', location: 'Khu Cardio A', lastMaintenance: '10/05/2026', priority: 'normal', issueDescription: 'Bàn đạp bị lỏng, cần thay thế vít' },
-  { id: 'EQ004', name: 'Máy kéo xô CrossFit', category: 'CrossFit', image: '⚡', status: 'available', location: 'Khu CrossFit', lastMaintenance: '20/02/2026' },
-  { id: 'EQ005', name: 'Tạ đơn Dumbbells Set', category: 'Tạ & Sức mạnh', image: '🏋️', status: 'available', location: 'Khu Tạ A', lastMaintenance: '05/04/2026' },
-  { id: 'EQ006', name: 'Máy chèo thuyền Concept2', category: 'Cardio', image: '🚣', status: 'maintenance', location: 'Khu Cardio B', lastMaintenance: '25/04/2026', priority: 'urgent', issueDescription: 'Màn hình bị lỗi, không hiển thị số liệu' },
-];
+const categoryNames: Record<'Cardio' | 'Strength' | 'Classroom' | 'Others', string> = {
+  Cardio: 'Cardio',
+  Strength: 'Tạ & Sức mạnh',
+  Classroom: 'Lớp học',
+  Others: 'Khác',
+};
+
+const categoryEmojis: Record<'Cardio' | 'Strength' | 'Classroom' | 'Others', string> = {
+  Cardio: '🏃',
+  Strength: '💪',
+  Classroom: '🧘',
+  Others: '🏋️',
+};
 
 export function EquipmentPage() {
-  const [equipments, setEquipments] = useState<Equipment[]>(initialEquipments);
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [facilities, setFacilities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [showReportModal, setShowReportModal] = useState<Equipment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState<Equipment | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showConfirmFixModal, setShowConfirmFixModal] = useState<Equipment | null>(null);
-  const [priority, setPriority] = useState('normal');
+  
   const [description, setDescription] = useState('');
   const [descriptionError, setDescriptionError] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  
   const [locationFilter, setLocationFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  
   const [availablePage, setAvailablePage] = useState(1);
   const [maintenancePage, setMaintenancePage] = useState(1);
   const pageSize = 4;
@@ -57,8 +70,72 @@ export function EquipmentPage() {
     location: false,
   });
 
+  const fetchFacilities = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/facilities`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Không thể tải danh sách khu vực');
+        return res.json();
+      })
+      .then(data => {
+        setFacilities(data);
+      })
+      .catch(err => console.error('Error fetching facilities:', err));
+  }, []);
+
+  const fetchEquipments = useCallback(() => {
+    const token = localStorage.getItem('token');
+    setLoading(true);
+    fetch(`${API_BASE}/facilities/equipment/list`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
+             throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          }
+          if (res.status === 403) {
+             throw new Error('Bạn không có quyền truy cập dữ liệu thiết bị.');
+          }
+          throw new Error('Không thể tải danh sách thiết bị.');
+        }
+        return res.json();
+      })
+      .then(data => {
+        const mapped: Equipment[] = data.map((item: any) => {
+          const activeReport = item.reports?.find((r: any) => r.status !== 'resolved');
+          return {
+            id: item.code,
+            dbId: item.id,
+            name: item.name,
+            category: item.category,
+            image: categoryEmojis[item.category as 'Cardio' | 'Strength' | 'Classroom' | 'Others'] || '🏋️',
+            status: item.status === 'active' ? 'available' : 'maintenance',
+            location: item.facility?.name || 'Chưa xác định',
+            lastMaintenance: item.lastMaintenance ? new Date(item.lastMaintenance).toLocaleDateString('vi-VN') : 'Chưa bảo trì',
+            issueDescription: activeReport?.description || undefined,
+            activeReportId: activeReport?.id || undefined,
+          };
+        });
+        setEquipments(mapped);
+        setError(null);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching equipment:', err);
+        setError(err.message || 'Có lỗi xảy ra khi kết nối máy chủ');
+        setLoading(false);
+      });
+  }, [fetchFacilities]);
+
+  useEffect(() => {
+    fetchFacilities();
+    fetchEquipments();
+  }, [fetchFacilities, fetchEquipments]);
+
   const handleAddEquipment = () => {
-    // Validate form
     const errors = {
       name: !addFormData.name.trim(),
       category: !addFormData.category,
@@ -67,50 +144,58 @@ export function EquipmentPage() {
 
     setAddFormErrors(errors);
 
-    // Check if there are any errors
     if (Object.values(errors).some(error => error)) {
       return;
     }
 
-    // Generate equipment ID
-    const newId = `EQ${String(equipments.length + 1).padStart(3, '0')}`;
+    const token = localStorage.getItem('token');
+    const newCode = `EQ${Date.now().toString().slice(-6)}`;
+    const lastMaintenanceDate = addFormData.maintenanceDate 
+      ? addFormData.maintenanceDate.split('/').reverse().join('-')
+      : new Date().toISOString().split('T')[0];
 
-    // Equipment emoji mapping
-    const categoryEmojis: Record<string, string> = {
-      'Cardio': '🏃',
-      'Tạ & Sức mạnh': '💪',
-      'Lớp học': '🧘',
-      'Khác': '🏋️',
-    };
-
-    const newEquipment: Equipment = {
-      id: newId,
+    const body = {
+      code: newCode,
       name: addFormData.name.trim(),
+      facilityId: parseInt(addFormData.location, 10),
       category: addFormData.category,
-      image: categoryEmojis[addFormData.category] || '🏋️',
-      status: 'available',
-      location: addFormData.location,
-      lastMaintenance: addFormData.maintenanceDate || new Date().toLocaleDateString('vi-VN'),
+      status: 'active',
+      lastMaintenance: lastMaintenanceDate,
     };
 
-    // Add to beginning of array
-    setEquipments([newEquipment, ...equipments]);
-
-    // Close modal
-    setShowAddModal(false);
-
-    // Reset form
-    setAddFormData({ name: '', category: '', location: '', maintenanceDate: '' });
-    setAddFormErrors({ name: false, category: false, location: false });
-
-    // Show success notification
-    setSuccessMessage('Đã thêm thiết bị mới thành công!');
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
+    fetch(`${API_BASE}/facilities/equipment/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.message || 'Thêm thiết bị thất bại');
+        }
+        return res.json();
+      })
+      .then(() => {
+        setShowAddModal(false);
+        setAddFormData({ name: '', category: '', location: '', maintenanceDate: '' });
+        setAddFormErrors({ name: false, category: false, location: false });
+        
+        setSuccessMessage('Đã thêm thiết bị mới thành công!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+        
+        fetchEquipments();
+      })
+      .catch((err) => {
+        console.error('Error adding equipment:', err);
+        alert(err.message || 'Lỗi thêm thiết bị');
+      });
   };
 
   const handleSubmitReport = () => {
-    // Validate description
     if (!description.trim()) {
       setDescriptionError(true);
       return;
@@ -118,44 +203,120 @@ export function EquipmentPage() {
 
     if (!showReportModal) return;
 
-    // Update equipment status to maintenance with priority and description
-    setEquipments(equipments.map(eq =>
-      eq.id === showReportModal.id
-        ? { ...eq, status: 'maintenance', priority: priority as 'normal' | 'urgent', issueDescription: description.trim() }
-        : eq
-    ));
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('currentUser');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+    const reporterId = currentUser?.id || 1;
 
-    // Close modal
-    setShowReportModal(null);
+    const reportBody = {
+      equipmentId: showReportModal.dbId,
+      reporterId: reporterId,
+      description: description.trim(),
+      status: 'pending',
+    };
 
-    // Reset form
-    setPriority('normal');
-    setDescription('');
-    setDescriptionError(false);
+    const updateBody = {
+      status: 'maintenance',
+    };
 
-    // Show success notification
-    setSuccessMessage('Đã ghi nhận sự cố thành công!');
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
+    Promise.all([
+      fetch(`${API_BASE}/facilities/reports/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(reportBody),
+      }),
+      fetch(`${API_BASE}/facilities/equipment/${showReportModal.dbId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(updateBody),
+      }),
+    ])
+      .then(async ([reportRes, updateRes]) => {
+        if (!reportRes.ok || !updateRes.ok) {
+          throw new Error('Ghi nhận sự cố thất bại');
+        }
+        return Promise.all([reportRes.json(), updateRes.json()]);
+      })
+      .then(() => {
+        setShowReportModal(null);
+        setDescription('');
+        setDescriptionError(false);
+
+        setSuccessMessage('Đã ghi nhận sự cố thành công!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+
+        fetchEquipments();
+      })
+      .catch((err) => {
+        console.error('Error reporting issue:', err);
+        alert(err.message || 'Lỗi ghi nhận sự cố');
+      });
   };
 
   const handleConfirmFix = () => {
     if (!showConfirmFixModal) return;
 
-    // Update equipment status back to available and clear maintenance data
-    setEquipments(equipments.map(eq =>
-      eq.id === showConfirmFixModal.id
-        ? { ...eq, status: 'available', priority: undefined, issueDescription: undefined, issueImage: undefined, lastMaintenance: new Date().toLocaleDateString('vi-VN') }
-        : eq
-    ));
+    const token = localStorage.getItem('token');
+    const reportId = showConfirmFixModal.activeReportId;
+    const dbId = showConfirmFixModal.dbId;
 
-    // Close modal
-    setShowConfirmFixModal(null);
+    const promises = [
+      fetch(`${API_BASE}/facilities/equipment/${dbId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          status: 'active',
+          lastMaintenance: new Date().toISOString().split('T')[0],
+        }),
+      }),
+    ];
 
-    // Show success notification
-    setSuccessMessage('Thiết bị đã được chuyển về trạng thái Sẵn sàng!');
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
+    if (reportId) {
+      promises.push(
+        fetch(`${API_BASE}/facilities/reports/${reportId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            status: 'resolved',
+            resolvedAt: new Date().toISOString(),
+          }),
+        })
+      );
+    }
+
+    Promise.all(promises)
+      .then(async (responses) => {
+        for (const res of responses) {
+          if (!res.ok) throw new Error('Xác nhận hoàn thành sửa chữa thất bại');
+        }
+        return Promise.all(responses.map(r => r.json()));
+      })
+      .then(() => {
+        setShowConfirmFixModal(null);
+
+        setSuccessMessage('Thiết bị đã được chuyển về trạng thái Sẵn sàng!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+
+        fetchEquipments();
+      })
+      .catch((err) => {
+        console.error('Error confirming fix:', err);
+        alert(err.message || 'Lỗi xác nhận sửa chữa');
+      });
   };
 
   const getFilteredEquipments = (status: 'available' | 'maintenance') => {
@@ -163,13 +324,7 @@ export function EquipmentPage() {
       const matchStatus = eq.status === status;
       const matchLocation = locationFilter === 'all' || eq.location === locationFilter;
 
-      // Priority filter only applies to maintenance items
-      let matchPriority = true;
-      if (status === 'maintenance' && priorityFilter !== 'all') {
-        matchPriority = eq.priority === priorityFilter;
-      }
-
-      return matchStatus && matchLocation && matchPriority;
+      return matchStatus && matchLocation;
     });
   };
 
@@ -240,24 +395,9 @@ export function EquipmentPage() {
             className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#FF7A00] focus:border-transparent"
           >
             <option value="all">Tất cả vị trí</option>
-            <option value="Khu Cardio A">Khu Cardio A</option>
-            <option value="Khu Cardio B">Khu Cardio B</option>
-            <option value="Khu Tạ A">Khu Tạ A</option>
-            <option value="Khu Tạ B">Khu Tạ B</option>
-            <option value="Phòng Yoga">Phòng Yoga</option>
-            <option value="Khu CrossFit">Khu CrossFit</option>
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Mức độ ưu tiên</label>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#FF7A00] focus:border-transparent"
-          >
-            <option value="all">Tất cả</option>
-            <option value="normal">Bình thường</option>
-            <option value="urgent">Ưu tiên sửa chữa</option>
+            {facilities.map((fac) => (
+              <option key={fac.id} value={fac.name}>{fac.name}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -286,29 +426,28 @@ export function EquipmentPage() {
                 {/* Content */}
                 <div className="p-4">
                   <h3 className="font-bold text-slate-900 mb-1">{equipment.name}</h3>
-                  <p className="text-sm text-slate-600 mb-3">{equipment.category}</p>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-slate-500">Vị trí:</span>
-                      <span className="font-medium text-slate-900">{equipment.location}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Wrench className="w-4 h-4 text-slate-500" />
-                      <span className="text-slate-500">Bảo trì: {equipment.lastMaintenance}</span>
-                    </div>
-                  </div>
-
-                  {/* Report Issue Button */}
-                  <button
-                    onClick={() => {
-                      setShowReportModal(equipment);
-                      setPriority('normal');
-                      setDescription('');
-                      setDescriptionError(false);
-                    }}
-                    className="w-full py-2 bg-white border border-slate-300 hover:border-[#FF7A00] text-slate-700 hover:text-[#FF7A00] rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                  >
+                  <p className="text-sm text-slate-600 mb-3">{categoryNames[equipment.category] || equipment.category}</p>
+ 
+                   <div className="space-y-2 mb-4">
+                     <div className="flex items-center gap-2 text-sm">
+                       <span className="text-slate-500">Vị trí:</span>
+                       <span className="font-medium text-slate-900">{equipment.location}</span>
+                     </div>
+                     <div className="flex items-center gap-2 text-sm">
+                       <Wrench className="w-4 h-4 text-slate-500" />
+                       <span className="text-slate-500">Bảo trì: {equipment.lastMaintenance}</span>
+                     </div>
+                   </div>
+ 
+                   {/* Report Issue Button */}
+                   <button
+                     onClick={() => {
+                       setShowReportModal(equipment);
+                       setDescription('');
+                       setDescriptionError(false);
+                     }}
+                     className="w-full py-2 bg-white border border-slate-300 hover:border-[#FF7A00] text-slate-700 hover:text-[#FF7A00] rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                   >
                     <AlertTriangle className="w-4 h-4" />
                     Báo sự cố
                   </button>
@@ -341,22 +480,12 @@ export function EquipmentPage() {
                   <div className="group-hover:scale-110 transition-transform duration-300">
                     {equipment.image}
                   </div>
-
-                  {/* Priority Tag */}
-                  {equipment.priority === 'urgent' && (
-                    <div className="absolute top-3 right-3">
-                      <div className="px-3 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" />
-                        Ưu tiên sửa chữa
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Content */}
                 <div className="p-4">
                   <h3 className="font-bold text-slate-900 mb-1">{equipment.name}</h3>
-                  <p className="text-sm text-slate-600 mb-3">{equipment.category}</p>
+                  <p className="text-sm text-slate-600 mb-3">{categoryNames[equipment.category] || equipment.category}</p>
 
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2 text-sm">
@@ -406,7 +535,6 @@ export function EquipmentPage() {
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fadeIn"
             onClick={() => {
               setShowReportModal(null);
-              setPriority('normal');
               setDescription('');
               setDescriptionError(false);
             }}
@@ -420,7 +548,6 @@ export function EquipmentPage() {
                 <button
                   onClick={() => {
                     setShowReportModal(null);
-                    setPriority('normal');
                     setDescription('');
                     setDescriptionError(false);
                   }}
@@ -443,43 +570,6 @@ export function EquipmentPage() {
                       <p className="text-xs text-slate-600 mb-1">Vị trí</p>
                       <p className="text-sm font-bold text-slate-900">{showReportModal.location}</p>
                     </div>
-                  </div>
-                </div>
-
-                {/* Priority */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-2">
-                    Mức độ ưu tiên
-                  </label>
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        name="priority"
-                        value="normal"
-                        checked={priority === 'normal'}
-                        onChange={(e) => setPriority(e.target.value)}
-                        className="w-4 h-4 text-[#FF7A00] focus:ring-[#FF7A00]"
-                      />
-                      <div>
-                        <p className="font-medium text-slate-900">Bình thường</p>
-                        <p className="text-xs text-slate-600">Có thể sửa trong vài ngày</p>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all hover:bg-slate-50">
-                      <input
-                        type="radio"
-                        name="priority"
-                        value="urgent"
-                        checked={priority === 'urgent'}
-                        onChange={(e) => setPriority(e.target.value)}
-                        className="w-4 h-4 text-red-500 focus:ring-red-500"
-                      />
-                      <div>
-                        <p className="font-medium text-slate-900">Ưu tiên sửa chữa</p>
-                        <p className="text-xs text-slate-600">Cần sửa sớm để tránh ảnh hưởng khách hàng</p>
-                      </div>
-                    </label>
                   </div>
                 </div>
 
@@ -523,7 +613,6 @@ export function EquipmentPage() {
                 <button
                   onClick={() => {
                     setShowReportModal(null);
-                    setPriority('normal');
                     setDescription('');
                     setDescriptionError(false);
                   }}
@@ -572,7 +661,7 @@ export function EquipmentPage() {
                     <div className="text-4xl">{showDetailsModal.image}</div>
                     <div>
                       <p className="font-bold text-slate-900">{showDetailsModal.name}</p>
-                      <p className="text-sm text-slate-600">{showDetailsModal.category}</p>
+                      <p className="text-sm text-slate-600">{categoryNames[showDetailsModal.category] || showDetailsModal.category}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -587,28 +676,6 @@ export function EquipmentPage() {
                   </div>
                 </div>
 
-                {/* Current Priority */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-2">
-                    Mức độ ưu tiên hiện tại
-                  </label>
-                  <div className={`p-3 rounded-lg border-2 ${showDetailsModal.priority === 'urgent' ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-300'}`}>
-                    <div className="flex items-center gap-2">
-                      {showDetailsModal.priority === 'urgent' && <AlertTriangle className="w-5 h-5 text-red-600" />}
-                      <div>
-                        <p className="font-bold text-slate-900">
-                          {showDetailsModal.priority === 'urgent' ? 'Ưu tiên sửa chữa' : 'Bình thường'}
-                        </p>
-                        <p className="text-xs text-slate-600">
-                          {showDetailsModal.priority === 'urgent'
-                            ? 'Cần sửa sớm để tránh ảnh hưởng khách hàng'
-                            : 'Có thể sửa trong vài ngày'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Issue Description */}
                 <div>
                   <label className="block text-sm font-medium text-slate-900 mb-2">
@@ -618,74 +685,6 @@ export function EquipmentPage() {
                     <p className="text-sm text-slate-700 whitespace-pre-wrap">
                       {showDetailsModal.issueDescription || 'Không có mô tả chi tiết'}
                     </p>
-                  </div>
-                </div>
-
-                {/* Issue Image (if available) */}
-                {showDetailsModal.issueImage && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-900 mb-2">
-                      Ảnh đính kèm
-                    </label>
-                    <div className="border border-slate-200 rounded-lg overflow-hidden">
-                      <img
-                        src={showDetailsModal.issueImage}
-                        alt="Issue"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Change Priority Section */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-900 mb-2">
-                    Thay đổi mức độ ưu tiên
-                  </label>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        setEquipments(equipments.map(eq =>
-                          eq.id === showDetailsModal.id
-                            ? { ...eq, priority: 'normal' }
-                            : eq
-                        ));
-                        setShowDetailsModal({ ...showDetailsModal, priority: 'normal' });
-                        setSuccessMessage('Đã cập nhật mức độ ưu tiên thành "Bình thường"');
-                        setShowSuccessNotification(true);
-                        setTimeout(() => setShowSuccessNotification(false), 3000);
-                      }}
-                      disabled={showDetailsModal.priority === 'normal'}
-                      className={`w-full py-2 px-4 border-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                        showDetailsModal.priority === 'normal'
-                          ? 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
-                          : 'bg-white border-slate-300 hover:border-[#FF7A00] text-slate-700 hover:text-[#FF7A00]'
-                      }`}
-                    >
-                      Chuyển về Bình thường
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEquipments(equipments.map(eq =>
-                          eq.id === showDetailsModal.id
-                            ? { ...eq, priority: 'urgent' }
-                            : eq
-                        ));
-                        setShowDetailsModal({ ...showDetailsModal, priority: 'urgent' });
-                        setSuccessMessage('Đã cập nhật mức độ ưu tiên thành "Ưu tiên sửa chữa"');
-                        setShowSuccessNotification(true);
-                        setTimeout(() => setShowSuccessNotification(false), 3000);
-                      }}
-                      disabled={showDetailsModal.priority === 'urgent'}
-                      className={`w-full py-2 px-4 border-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                        showDetailsModal.priority === 'urgent'
-                          ? 'bg-red-100 border-red-300 text-red-400 cursor-not-allowed'
-                          : 'bg-white border-red-300 hover:bg-red-50 text-red-700'
-                      }`}
-                    >
-                      <AlertTriangle className="w-4 h-4" />
-                      Chuyển thành Ưu tiên sửa chữa
-                    </button>
                   </div>
                 </div>
               </div>
@@ -772,9 +771,9 @@ export function EquipmentPage() {
                   >
                     <option value="">-- Chọn loại thiết bị --</option>
                     <option value="Cardio">Cardio</option>
-                    <option value="Tạ & Sức mạnh">Tạ & Sức mạnh</option>
-                    <option value="Lớp học">Lớp học</option>
-                    <option value="Khác">Khác</option>
+                    <option value="Strength">Tạ & Sức mạnh</option>
+                    <option value="Classroom">Lớp học</option>
+                    <option value="Others">Khác</option>
                   </select>
                   {addFormErrors.category && <p className="text-xs text-red-500 mt-1">Vui lòng chọn loại thiết bị</p>}
                 </div>
@@ -795,13 +794,9 @@ export function EquipmentPage() {
                     }`}
                   >
                     <option value="">-- Chọn vị trí --</option>
-                    <option value="Khu Cardio A">Khu Cardio A</option>
-                    <option value="Khu Cardio B">Khu Cardio B</option>
-                    <option value="Khu Tạ A">Khu Tạ A</option>
-                    <option value="Khu Tạ B">Khu Tạ B</option>
-                    <option value="Phòng Yoga">Phòng Yoga</option>
-                    <option value="Khu CrossFit">Khu CrossFit</option>
-                    <option value="Toàn bộ">Toàn bộ</option>
+                    {facilities.map((fac) => (
+                      <option key={fac.id} value={fac.id}>{fac.name}</option>
+                    ))}
                   </select>
                   {addFormErrors.location && <p className="text-xs text-red-500 mt-1">Vui lòng chọn vị trí đặt máy</p>}
                 </div>

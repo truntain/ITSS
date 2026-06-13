@@ -1,8 +1,11 @@
-"use client";
+﻿"use client";
 
-import { ChevronLeft, ChevronRight, Copy, MapPin, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, MapPin, Plus, X, Trash } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { addWeeks, startOfWeek, format, isSameDay, addDays, differenceInWeeks } from 'date-fns';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface ShiftEvent {
   id: string;
@@ -17,18 +20,6 @@ interface DaySchedule {
   shifts: ShiftEvent[];
 }
 
-// Mock staff data
-const staffMembers = [
-  { id: 'staff1', name: 'Nguyễn Văn A', role: 'manager' as const },
-  { id: 'staff2', name: 'Trần Thị B', role: 'pt' as const },
-  { id: 'staff3', name: 'Lê Văn C', role: 'receptionist' as const },
-  { id: 'staff4', name: 'Phạm Thị D', role: 'pt' as const },
-  { id: 'staff5', name: 'Hoàng Văn E', role: 'manager' as const },
-  { id: 'staff6', name: 'Vũ Thị F', role: 'pt' as const },
-  { id: 'staff7', name: 'Đặng Văn G', role: 'receptionist' as const },
-  { id: 'staff8', name: 'Bùi Thị H', role: 'pt' as const },
-];
-
 const locations = [
   'Khu vực Tạ',
   'Khu Cardio',
@@ -42,21 +33,6 @@ const shiftPresets = [
   { label: 'Ca chiều', value: '14:00 - 22:00' },
   { label: 'Ca hành chính', value: '08:00 - 17:00' },
 ];
-
-// Initial seed data for current week only
-const initialShifts: Record<string, ShiftEvent[]> = {
-  '2026-05-12': [ // Monday May 12
-    { id: '1', staffName: 'Nguyễn Văn A', role: 'manager', time: '06:00 - 14:00', location: 'Khu vực Tạ' },
-    { id: '2', staffName: 'Trần Thị B', role: 'pt', time: '14:00 - 22:00', location: 'Khu Cardio' },
-  ],
-  '2026-05-13': [ // Tuesday
-    { id: '3', staffName: 'Lê Văn C', role: 'receptionist', time: '06:00 - 14:00', location: 'Lễ tân' },
-    { id: '4', staffName: 'Phạm Thị D', role: 'pt', time: '18:00 - 22:00', location: 'Phòng Yoga' },
-  ],
-  '2026-05-17': [ // Saturday - today
-    { id: '12', staffName: 'Phan Thị M', role: 'manager', time: '08:00 - 16:00', location: 'Toàn bộ' },
-  ],
-};
 
 const getRoleColor = (role: string) => {
   switch (role) {
@@ -115,13 +91,13 @@ const getFirstWeekOfMonth = (year: number, month: number): Date => {
 
 export function SchedulePage() {
   const [hoveredShift, setHoveredShift] = useState<string | null>(null);
-  const today = new Date(2026, 4, 17); // May 17, 2026 (Saturday)
+  const today = new Date();
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
     startOfWeek(today, { weekStartsOn: 1 }) // Monday as first day
   );
 
   const [shifts, setShifts] = useState<Record<string, ShiftEvent[]>>({});
-  const [staffsList, setStaffsList] = useState<{ id: string; name: string; role: 'manager' | 'pt' | 'receptionist' }[]>([]);
+  const [staffsList, setStaffsList] = useState<{ id: string; name: string; role: 'manager' | 'pt' | 'receptionist'; dbRole: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -173,7 +149,7 @@ export function SchedulePage() {
 
   const fetchStaffs = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/staffs', {
+    fetch(`${API_BASE}/staffs`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -182,6 +158,7 @@ export function SchedulePage() {
           id: String(user.id),
           name: user.fullName || user.email,
           role: mapDbRoleToFrontend(user.role),
+          dbRole: user.role,
         }));
         setStaffsList(formatted);
       })
@@ -193,7 +170,7 @@ export function SchedulePage() {
     const endDate = format(addDays(currentWeekStart, 6), 'yyyy-MM-dd');
     setLoading(true);
     const token = localStorage.getItem('token');
-    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+    fetch(`${API_BASE}/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -325,7 +302,7 @@ export function SchedulePage() {
     };
 
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/work-shifts', {
+    fetch(`${API_BASE}/work-shifts`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -333,8 +310,12 @@ export function SchedulePage() {
       },
       body: JSON.stringify(payload),
     })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to create shift');
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          const message = errData?.message || 'Failed to create shift';
+          throw new Error(Array.isArray(message) ? message.join(', ') : message);
+        }
         return res.json();
       })
       .then(() => {
@@ -343,7 +324,25 @@ export function SchedulePage() {
       })
       .catch(err => {
         console.error(err);
-        alert('Lỗi khi lưu ca trực');
+        alert(`Lỗi khi lưu ca trực: ${err.message}`);
+      });
+  };
+
+  const handleDeleteShift = (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa ca trực này không?')) return;
+
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/work-shifts/${id}`, {
+      method: 'DELETE',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to delete shift');
+        fetchShifts();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Lỗi khi xóa ca trực');
       });
   };
 
@@ -353,7 +352,7 @@ export function SchedulePage() {
     const endDate = format(addDays(lastWeekStart, 6), 'yyyy-MM-dd');
     const token = localStorage.getItem('token');
 
-    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+    fetch(`${API_BASE}/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -375,7 +374,7 @@ export function SchedulePage() {
           };
         });
 
-        return fetch('http://localhost:3001/work-shifts/bulk', {
+        return fetch(`${API_BASE}/work-shifts/bulk`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -566,13 +565,25 @@ export function SchedulePage() {
                           }`}
                           style={{ fontFamily: 'Arial, sans-serif' }}
                         >
-                          <div className="flex items-start justify-between mb-1">
-                            <p className="font-medium text-sm flex-1">{shift.staffName}</p>
-                            {isShiftToday && (
-                              <span className="text-[9px] px-1.5 py-0.5 bg-orange-500 text-white rounded-full font-medium">
-                                Đang diễn ra
-                              </span>
-                            )}
+                          <div className="flex items-start justify-between mb-1 gap-2">
+                            <p className="font-medium text-sm flex-1 truncate">{shift.staffName}</p>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {isShiftToday && (
+                                <span className="text-[9px] px-1.5 py-0.5 bg-orange-500 text-white rounded-full font-medium">
+                                  Đang trực
+                                </span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteShift(shift.id);
+                                }}
+                                className="p-1 hover:bg-black/10 rounded text-red-600 transition-colors"
+                                title="Xóa ca trực"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                           <p className="text-xs opacity-80">{shift.time}</p>
                           <p className="text-xs opacity-70 mt-1 flex items-center gap-1">
@@ -673,11 +684,13 @@ export function SchedulePage() {
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
                   >
                     <option value="">-- Chọn nhân viên --</option>
-                    {staffsList.map(staff => (
-                      <option key={staff.id} value={staff.id}>
-                        {staff.name} ({getRoleLabel(staff.role)})
-                      </option>
-                    ))}
+                    {staffsList
+                      .filter(staff => staff.dbRole === 'NV')
+                      .map(staff => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.name} ({getRoleLabel(staff.role)})
+                        </option>
+                      ))}
                   </select>
                 </div>
 

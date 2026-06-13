@@ -34,8 +34,6 @@ export function PTSchedulePage() {
     return monday;
   });
 
-
-
   // Helper to format Date to YYYY-MM-DD
   const formatDateStr = (d: Date) => {
     const year = d.getFullYear();
@@ -143,6 +141,31 @@ export function PTSchedulePage() {
     }
     fetchSchedules();
   }, []);
+
+  const handleAttendanceChange = (bookingId: number, attendance: 'present' | 'absent') => {
+    const token = localStorage.getItem('token');
+    const newAttendanceStatus = attendance === 'present' ? 'checked_in' : 'absent';
+
+    fetch(`http://localhost:3001/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ attendanceStatus: newAttendanceStatus }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Cập nhật thất bại');
+        // Update local state to reflect change instantly
+        setAllBookings(prev =>
+          prev.map(b => (b.id === bookingId ? { ...b, attendanceStatus: newAttendanceStatus } : b))
+        );
+        toast.success('Đã lưu cập nhật điểm danh thành công!');
+      })
+      .catch(() => {
+        toast.error('Không thể cập nhật điểm danh');
+      });
+  };
 
   // Filter and map database bookings to UI schedule blocks for selectedDate
   const selectedDateStr = formatDateStr(selectedDate);
@@ -377,7 +400,7 @@ export function PTSchedulePage() {
           </h3>
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <Clock className="w-4 h-4" />
-            <span>08:00 - 20:00</span>
+            <span>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
           </div>
         </div>
 
@@ -412,21 +435,30 @@ export function PTSchedulePage() {
                   </div>
                 </div>
 
-                {/* Attendance Badge Display (Read Only) */}
+                {/* Attendance Control */}
                 <div className="flex-shrink-0 flex items-center gap-3">
-                  {block.attendance === 'future' ? (
-                    <span className="px-4 py-2 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg text-sm font-bold shadow-sm">
-                      Chưa tới
-                    </span>
-                  ) : block.attendance === 'present' ? (
-                    <span className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-bold shadow-sm">
+                  <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-1">
+                    <button
+                      onClick={() => handleAttendanceChange(block.id, 'present')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                        block.attendance === 'present'
+                          ? 'bg-emerald-500 text-white shadow-md'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                      }`}
+                    >
                       Có mặt
-                    </span>
-                  ) : (
-                    <span className="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-bold shadow-sm">
+                    </button>
+                    <button
+                      onClick={() => handleAttendanceChange(block.id, 'absent')}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                        block.attendance === 'absent'
+                          ? 'bg-red-500 text-white shadow-md'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                      }`}
+                    >
                       Vắng mặt
-                    </span>
-                  )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -437,7 +469,6 @@ export function PTSchedulePage() {
           )}
         </div>
       </div>
-
     </div>
   );
 }

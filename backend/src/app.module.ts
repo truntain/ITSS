@@ -18,6 +18,7 @@ import { FacilitiesModule } from './facilities/facilities.module';
 import { FeedbacksModule } from './feedbacks/feedbacks.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { PaymentsModule } from './payments/payments.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { PaymentsModule } from './payments/payments.module';
     FeedbacksModule,
     MembershipsModule,
     PaymentsModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

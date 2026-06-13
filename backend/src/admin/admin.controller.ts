@@ -27,6 +27,12 @@ export class AdminController {
     return this.adminService.findAll();
   }
 
+  @Get('dashboard/summary')
+  @ApiOperation({ summary: 'Lấy thông tin tổng quan dashboard cho Admin' })
+  getDashboardSummary() {
+    return this.adminService.getDashboardSummary();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết thông tin quản trị viên (Admin)' })
   findOne(@Param('id') id: string) {

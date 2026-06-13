@@ -29,6 +29,7 @@ export class MembershipsService {
 
   async findAllPackages() {
     return this.packageRepository.find({
+      relations: { memberships: true },
       order: { id: 'ASC' },
     });
   }
@@ -48,7 +49,18 @@ export class MembershipsService {
   }
 
   async removePackage(id: string) {
-    const pkg = await this.findOnePackage(id);
+    const pkg = await this.packageRepository.findOne({
+      where: { id },
+      relations: { memberships: true },
+    });
+    if (!pkg) {
+      throw new NotFoundException(`Không tìm thấy gói tập với ID #${id}`);
+    }
+    if (pkg.memberships && pkg.memberships.length > 0) {
+      pkg.isVisible = false;
+      await this.packageRepository.save(pkg);
+      return { message: 'Gói tập đã có hội viên sử dụng nên hệ thống đã tự động chuyển sang trạng thái ẩn (ngừng cung cấp mới) thay vì xóa hoàn toàn.' };
+    }
     await this.packageRepository.remove(pkg);
     return { message: 'Xóa gói tập thành công' };
   }
@@ -56,7 +68,10 @@ export class MembershipsService {
   // --- Membership CRUD ---
   async create(createMembershipDto: CreateMembershipDto) {
     // Validate package exists
-    await this.findOnePackage(createMembershipDto.packageId);
+    const pkg = await this.findOnePackage(createMembershipDto.packageId);
+    if (!pkg.isVisible) {
+      throw new BadRequestException(`Gói tập #${createMembershipDto.packageId} đã ngừng cung cấp và không thể đăng ký mới!`);
+    }
 
     // Check if there is an active membership for this user
     const activeMembership = await this.findActiveByUserId(createMembershipDto.userId);

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -48,7 +48,7 @@ export default function RegisterPage() {
     // Check if there are any errors
     if (!Object.values(newErrors).some((error) => error)) {
       try {
-        const response = await fetch('http://localhost:3001/auth/register', {
+        const response = await fetch(`${'http://localhost:3001'}/auth/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

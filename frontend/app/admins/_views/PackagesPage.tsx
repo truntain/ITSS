@@ -1,117 +1,357 @@
-"use client";
+﻿"use client";
 
 import { Search, Plus, Edit, Trash2, Tag, Dumbbell, X, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Pagination } from '@/components/Pagination';
 
+const API_BASE = 'http://localhost:3001';
 
 interface Package {
   id: string;
   name: string;
-  type: 'Cơ bản' | 'VIP' | 'PT Kèm 1-1';
-  duration: string;
+  type: string;
+  durationMonths: number;
   price: number;
-  activeMembers: number;
+  activeMembers?: number;
   isVisible: boolean;
   benefits: string[];
 }
 
 interface Voucher {
-  id: string;
+  id: number;
   code: string;
   discountType: 'percent' | 'fixed';
   discountValue: number;
   used: number;
   total: number;
-  startDate: string;
-  endDate: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
   status: 'active' | 'expired' | 'depleted';
 }
 
-const initialPackages: Package[] = [
-  {
-    id: 'PKG001',
-    name: 'Gói Khởi Động',
-    type: 'Cơ bản',
-    duration: '1 tháng',
-    price: 500000,
-    activeMembers: 124,
-    isVisible: true,
-    benefits: ['Tập luyện không giới hạn', 'Sử dụng phòng tập toàn thời gian', 'Hỗ trợ từ nhân viên']
-  },
-  {
-    id: 'PKG002',
-    name: 'Gói Tiêu Chuẩn',
-    type: 'VIP',
-    duration: '3 tháng',
-    price: 1350000,
-    activeMembers: 203,
-    isVisible: true,
-    benefits: ['Tất cả quyền lợi gói Khởi Động', 'Tặng 1 buổi tư vấn PT', 'Đo chỉ số cơ thể miễn phí']
-  },
-  {
-    id: 'PKG003',
-    name: 'Gói VIP',
-    type: 'VIP',
-    duration: '6 tháng',
-    price: 2500000,
-    activeMembers: 156,
-    isVisible: true,
-    benefits: ['Tất cả quyền lợi gói Tiêu Chuẩn', 'Tặng 3 buổi PT riêng', 'Ưu tiên đặt lịch', 'Tủ khóa cá nhân']
-  },
-  {
-    id: 'PKG004',
-    name: 'Gói Premium',
-    type: 'VIP',
-    duration: '12 tháng',
-    price: 4200000,
-    activeMembers: 89,
-    isVisible: true,
-    benefits: ['Tất cả quyền lợi gói VIP', 'Tặng 10 buổi PT riêng', 'Kế hoạch tập luyện cá nhân hóa']
-  },
-  {
-    id: 'PKG005',
-    name: 'Gói PT 1-1',
-    type: 'PT Kèm 1-1',
-    duration: '1 tháng',
-    price: 3000000,
-    activeMembers: 45,
-    isVisible: true,
-    benefits: ['Huấn luyện viên riêng', 'Kế hoạch cá nhân hóa', 'Theo dõi tiến độ hàng tuần']
-  },
-];
-
-const initialVouchers: Voucher[] = [
-  { id: 'V001', code: 'SUMMER2026', discountType: 'percent', discountValue: 20, used: 45, total: 100, startDate: '01/05/2026', endDate: '30/06/2026', status: 'active' },
-  { id: 'V002', code: 'NEWYEAR50', discountType: 'fixed', discountValue: 50000, used: 150, total: 150, startDate: '01/01/2026', endDate: '31/01/2026', status: 'depleted' },
-  { id: 'V003', code: 'FIRSTTIME', discountType: 'percent', discountValue: 15, used: 23, total: 50, startDate: '01/01/2026', endDate: '31/12/2026', status: 'active' },
-  { id: 'V004', code: 'STUDENT30', discountType: 'fixed', discountValue: 30000, used: 12, total: 30, startDate: '01/03/2026', endDate: '15/08/2026', status: 'active' },
-  { id: 'V005', code: 'BLACKFRIDAY', discountType: 'percent', discountValue: 50, used: 200, total: 200, startDate: '25/11/2025', endDate: '30/11/2025', status: 'expired' },
-];
-
 export function PackagesPage() {
-  const [packages, setPackages] = useState<Package[]>(initialPackages);
-  const [vouchers, setVouchers] = useState<Voucher[]>(initialVouchers);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [activeTab, setActiveTab] = useState<'packages' | 'vouchers'>('packages');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Modals
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | number | null>(null);
+
+  // Editing state
   const [editingPackage, setEditingPackage] = useState<Package | null>(null);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+
+  // Benefits editing state
   const [newBenefit, setNewBenefit] = useState('');
   const [benefits, setBenefits] = useState<string[]>([]);
+
+  // Notifications
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Pagination states
   const [packagePage, setPackagePage] = useState(1);
   const [packagePageSize, setPackagePageSize] = useState(5);
   const [voucherPage, setVoucherPage] = useState(1);
   const [voucherPageSize, setVoucherPageSize] = useState(5);
 
+  const getToken = () => localStorage.getItem('token') || '';
+
+  // Helpers for formatting dates (DB uses YYYY-MM-DD, UI uses DD/MM/YYYY)
+  const formatDbDateToUi = (dateStr: string) => {
+    if (!dateStr) return '';
+    const dateOnly = dateStr.split('T')[0];
+    const [year, month, day] = dateOnly.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatUiDateToDb = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [day, month, year] = dateStr.split('/');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatDurationMonthsToUi = (months: number) => {
+    return `${months} tháng`;
+  };
+
+  const formatUiDurationToMonths = (durationStr: string) => {
+    const months = parseInt(durationStr);
+    return isNaN(months) ? 1 : months;
+  };
+
+  // Fetch API handlers
+  const fetchPackages = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/memberships/packages`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không thể tải danh sách gói tập');
+      const data = await res.json();
+      // Calculate active members from memberships array
+      const mapped = data.map((pkg: any) => ({
+        ...pkg,
+        activeMembers: pkg.memberships?.filter((m: any) => m.status === 'active').length || 0,
+      }));
+      setPackages(mapped);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const fetchVouchers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/payments/vouchers`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) throw new Error('Không thể tải danh sách voucher');
+      const data = await res.json();
+      setVouchers(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  const loadAllData = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([fetchPackages(), fetchVouchers()]);
+    setIsLoading(false);
+  }, [fetchPackages, fetchVouchers]);
+
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
+  // Package Form state
+  const [formData, setFormData] = useState({
+    code: '', // Package ID
+    name: '',
+    price: '',
+    duration: '1 tháng',
+    type: 'Cơ bản',
+  });
+
+  const [formErrors, setFormErrors] = useState({
+    code: false,
+    name: false,
+    price: false,
+    benefits: false,
+  });
+
+  // Voucher Form state
+  const [voucherFormData, setVoucherFormData] = useState({
+    code: '',
+    discountType: 'percent' as 'percent' | 'fixed',
+    discountValue: '',
+    total: '100',
+    startDate: '',
+    endDate: '',
+  });
+
+  const [voucherFormErrors, setVoucherFormErrors] = useState({
+    code: false,
+    discountValue: false,
+    total: false,
+    startDate: false,
+    endDate: false,
+  });
+
+  // Action triggers
+  const handleAddPackage = async () => {
+    const errors = {
+      code: !editingPackage && (!formData.code.trim() || formData.code.trim().length > 50),
+      name: !formData.name.trim(),
+      price: !formData.price || Number(formData.price) <= 0,
+      benefits: benefits.length === 0,
+    };
+
+    setFormErrors(errors);
+
+    if (Object.values(errors).some(error => error)) {
+      return;
+    }
+
+    try {
+      const payload = {
+        name: formData.name.trim(),
+        type: formData.type,
+        durationMonths: formatUiDurationToMonths(formData.duration),
+        price: Number(formData.price),
+        benefits: benefits,
+        isVisible: true,
+      };
+
+      let res;
+      if (editingPackage) {
+        res = await fetch(`${API_BASE}/memberships/packages/${editingPackage.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/memberships/packages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({
+            ...payload,
+            id: formData.code.trim().toUpperCase(),
+          }),
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Thao tác thất bại');
+      }
+
+      setSuccessMessage(editingPackage ? 'Cập nhật gói tập thành công!' : 'Thêm gói tập thành công!');
+      setShowPackageModal(false);
+      setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+      setBenefits([]);
+      setEditingPackage(null);
+
+      // Trigger notification
+      setShowSuccessNotification(true);
+      setTimeout(() => setShowSuccessNotification(false), 3000);
+      fetchPackages();
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+    }
+  };
+
+  const handleAddVoucher = async () => {
+    const errors = {
+      code: !voucherFormData.code.trim(),
+      discountValue: !voucherFormData.discountValue || Number(voucherFormData.discountValue) <= 0,
+      total: !voucherFormData.total || Number(voucherFormData.total) <= 0,
+      startDate: !voucherFormData.startDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(voucherFormData.startDate),
+      endDate: !voucherFormData.endDate || !/^\d{2}\/\d{2}\/\d{4}$/.test(voucherFormData.endDate),
+    };
+
+    setVoucherFormErrors(errors);
+
+    if (Object.values(errors).some(error => error)) {
+      return;
+    }
+
+    try {
+      const payload = {
+        code: voucherFormData.code.trim().toUpperCase(),
+        discountType: voucherFormData.discountType,
+        discountValue: Number(voucherFormData.discountValue),
+        total: Math.floor(Number(voucherFormData.total)),
+        startDate: formatUiDateToDb(voucherFormData.startDate),
+        endDate: formatUiDateToDb(voucherFormData.endDate),
+      };
+
+      let res;
+      if (editingVoucher) {
+        res = await fetch(`${API_BASE}/payments/vouchers/${editingVoucher.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/payments/vouchers`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Thao tác thất bại');
+      }
+
+      setSuccessMessage(editingVoucher ? 'Cập nhật mã khuyến mãi thành công!' : 'Thêm mã khuyến mãi thành công!');
+      setShowVoucherModal(false);
+      setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', total: '100', startDate: '', endDate: '' });
+      setEditingVoucher(null);
+
+      setShowSuccessNotification(true);
+      setTimeout(() => setShowSuccessNotification(false), 3000);
+      fetchVouchers();
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra, vui lòng thử lại.');
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!showDeleteConfirm) return;
+
+    try {
+      let res;
+      if (activeTab === 'packages') {
+        res = await fetch(`${API_BASE}/memberships/packages/${showDeleteConfirm}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+      } else {
+        res = await fetch(`${API_BASE}/payments/vouchers/${showDeleteConfirm}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Xóa thất bại');
+      }
+
+      let successMsg = activeTab === 'packages' ? 'Đã xóa gói tập thành công!' : 'Đã xóa mã khuyến mãi thành công!';
+      try {
+        const data = await res.json();
+        if (data && data.message) {
+          successMsg = data.message;
+        }
+      } catch (e) {
+        console.error('Không thể parse dữ liệu phản hồi từ API', e);
+      }
+
+      setSuccessMessage(successMsg);
+      setShowDeleteConfirm(null);
+
+      setShowSuccessNotification(true);
+      setTimeout(() => setShowSuccessNotification(false), 3000);
+
+      if (activeTab === 'packages') {
+        fetchPackages();
+      } else {
+        fetchVouchers();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Không thể xóa do dữ liệu đang được sử dụng ở nơi khác.');
+    }
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    setPackagePage(1);
+    setVoucherPage(1);
+  };
+
   const filteredPackages = packages.filter(pkg =>
-    pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pkg.type.toLowerCase().includes(searchTerm.toLowerCase())
+    pkg.isVisible !== false && (
+      pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pkg.type.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const totalPackagePages = Math.max(Math.ceil(filteredPackages.length / packagePageSize), 1);
@@ -132,204 +372,6 @@ export function PackagesPage() {
     activeVoucherPage * voucherPageSize
   );
 
-  const handleSearchChange = (val: string) => {
-    setSearchTerm(val);
-    setPackagePage(1);
-    setVoucherPage(1);
-  };
-
-  // Package Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    duration: '1 tháng',
-    type: 'Cơ bản' as 'Cơ bản' | 'VIP' | 'PT Kèm 1-1',
-  });
-
-  const [formErrors, setFormErrors] = useState({
-    name: false,
-    price: false,
-    benefits: false,
-  });
-
-  // Voucher Form state
-  const [voucherFormData, setVoucherFormData] = useState({
-    code: '',
-    discountType: 'percent' as 'percent' | 'fixed',
-    discountValue: '',
-    startDate: '',
-    endDate: '',
-  });
-
-  const [voucherFormErrors, setVoucherFormErrors] = useState({
-    code: false,
-    discountValue: false,
-    startDate: false,
-    endDate: false,
-  });
-
-  const handleAddPackage = () => {
-    // Validate form
-    const errors = {
-      name: !formData.name.trim(),
-      price: !formData.price || Number(formData.price) <= 0,
-      benefits: benefits.length === 0,
-    };
-
-    setFormErrors(errors);
-
-    // Check if there are any errors
-    if (Object.values(errors).some(error => error)) {
-      return;
-    }
-
-    if (editingPackage) {
-      // Update existing package
-      setPackages(packages.map(pkg =>
-        pkg.id === editingPackage.id
-          ? {
-              ...pkg,
-              name: formData.name.trim(),
-              type: formData.type,
-              duration: formData.duration,
-              price: Number(formData.price),
-              benefits: benefits,
-            }
-          : pkg
-      ));
-      setSuccessMessage('Cập nhật gói tập thành công!');
-    } else {
-      // Generate package ID
-      const newId = `PKG${String(packages.length + 1).padStart(3, '0')}`;
-
-      const newPackage: Package = {
-        id: newId,
-        name: formData.name.trim(),
-        type: formData.type,
-        duration: formData.duration,
-        price: Number(formData.price),
-        activeMembers: 0,
-        isVisible: true,
-        benefits: benefits,
-      };
-
-      setPackages([newPackage, ...packages]);
-      setPackagePage(1);
-      setSuccessMessage('Thêm gói tập thành công!');
-    }
-
-    setShowPackageModal(false);
-
-    // Reset form
-    setFormData({ name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
-    setFormErrors({ name: false, price: false, benefits: false });
-    setBenefits([]);
-    setEditingPackage(null);
-
-    // Show success notification
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
-  };
-
-  const handleAddVoucher = () => {
-    // Validate form
-    const errors = {
-      code: !voucherFormData.code.trim(),
-      discountValue: !voucherFormData.discountValue || Number(voucherFormData.discountValue) <= 0,
-      startDate: !voucherFormData.startDate,
-      endDate: !voucherFormData.endDate,
-    };
-
-    setVoucherFormErrors(errors);
-
-    // Check if there are any errors
-    if (Object.values(errors).some(error => error)) {
-      return;
-    }
-
-    if (editingVoucher) {
-      // Update existing voucher
-      setVouchers(vouchers.map(v =>
-        v.id === editingVoucher.id
-          ? {
-              ...v,
-              code: voucherFormData.code.trim().toUpperCase(),
-              discountType: voucherFormData.discountType,
-              discountValue: Number(voucherFormData.discountValue),
-              startDate: voucherFormData.startDate,
-              endDate: voucherFormData.endDate,
-            }
-          : v
-      ));
-      setSuccessMessage('Cập nhật mã khuyến mãi thành công!');
-    } else {
-      // Generate voucher ID
-      const newId = `V${String(vouchers.length + 1).padStart(3, '0')}`;
-
-      const newVoucher: Voucher = {
-        id: newId,
-        code: voucherFormData.code.trim().toUpperCase(),
-        discountType: voucherFormData.discountType,
-        discountValue: Number(voucherFormData.discountValue),
-        used: 0,
-        total: 100,
-        startDate: voucherFormData.startDate,
-        endDate: voucherFormData.endDate,
-        status: 'active',
-      };
-
-      setVouchers([newVoucher, ...vouchers]);
-      setVoucherPage(1);
-      setSuccessMessage('Thêm mã khuyến mãi thành công!');
-    }
-
-    setShowVoucherModal(false);
-
-    // Reset form
-    setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', startDate: '', endDate: '' });
-    setVoucherFormErrors({ code: false, discountValue: false, startDate: false, endDate: false });
-    setEditingVoucher(null);
-
-    // Show success notification
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!showDeleteConfirm) return;
-
-    if (activeTab === 'packages') {
-      const updated = packages.filter(pkg => pkg.id !== showDeleteConfirm);
-      setPackages(updated);
-      const updatedFiltered = updated.filter(pkg =>
-        pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pkg.type.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      const newTotalPages = Math.max(Math.ceil(updatedFiltered.length / packagePageSize), 1);
-      if (packagePage > newTotalPages) {
-        setPackagePage(newTotalPages);
-      }
-      setSuccessMessage('Đã xóa gói tập thành công!');
-    } else {
-      const updated = vouchers.filter(v => v.id !== showDeleteConfirm);
-      setVouchers(updated);
-      const updatedFiltered = updated.filter(v =>
-        v.code.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      const newTotalPages = Math.max(Math.ceil(updatedFiltered.length / voucherPageSize), 1);
-      if (voucherPage > newTotalPages) {
-        setVoucherPage(newTotalPages);
-      }
-      setSuccessMessage('Đã xóa mã khuyến mãi thành công!');
-    }
-
-    setShowDeleteConfirm(null);
-
-    // Show success notification
-    setShowSuccessNotification(true);
-    setTimeout(() => setShowSuccessNotification(false), 3000);
-  };
-
   const getTypeBadge = (type: string) => {
     switch (type) {
       case 'Cơ bản':
@@ -344,19 +386,18 @@ export function PackagesPage() {
   };
 
   const getVoucherStatus = (voucher: Voucher) => {
-    // Auto-calculate status based on current date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Parse endDate (format: DD/MM/YYYY)
-    const [day, month, year] = voucher.endDate.split('/').map(Number);
-    const endDate = new Date(year, month - 1, day);
+    const endDate = new Date(voucher.endDate);
     endDate.setHours(0, 0, 0, 0);
 
-    if (endDate >= today) {
-      return { bg: 'bg-emerald-50', text: 'text-emerald-600', label: 'Đang chạy' };
+    if (voucher.used >= voucher.total) {
+      return { bg: 'bg-red-50', text: 'text-red-600', label: 'Đã hết lượt' };
+    } else if (endDate < today) {
+      return { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Hết hạn' };
     } else {
-      return { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Đã kết thúc' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-600', label: 'Đang chạy' };
     }
   };
 
@@ -370,6 +411,14 @@ export function PackagesPage() {
   const handleRemoveBenefit = (index: number) => {
     setBenefits(benefits.filter((_, i) => i !== index));
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--primary)] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -432,14 +481,14 @@ export function PackagesPage() {
         <button
           onClick={() => {
             if (activeTab === 'packages') {
-              setFormData({ name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
-              setFormErrors({ name: false, price: false, benefits: false });
+              setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+              setFormErrors({ code: false, name: false, price: false, benefits: false });
               setBenefits([]);
               setEditingPackage(null);
               setShowPackageModal(true);
             } else {
-              setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', startDate: '', endDate: '' });
-              setVoucherFormErrors({ code: false, discountValue: false, startDate: false, endDate: false });
+              setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', total: '100', startDate: '', endDate: '' });
+              setVoucherFormErrors({ code: false, discountValue: false, total: false, startDate: false, endDate: false });
               setEditingVoucher(null);
               setShowVoucherModal(true);
             }
@@ -458,6 +507,7 @@ export function PackagesPage() {
             <table className="w-full">
               <thead className="bg-[var(--secondary)]">
                 <tr>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Mã gói</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Tên gói</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Loại gói</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Thời hạn</th>
@@ -469,6 +519,7 @@ export function PackagesPage() {
               <tbody className="divide-y divide-[var(--border)]">
                 {paginatedPackages.map((pkg) => (
                   <tr key={pkg.id} className="hover:bg-[#F1F5F9] transition-colors">
+                    <td className="px-6 py-4 text-sm font-semibold text-[var(--foreground)]">{pkg.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Dumbbell className="w-4 h-4 text-[var(--muted-foreground)] flex-shrink-0" />
@@ -480,7 +531,9 @@ export function PackagesPage() {
                         {pkg.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--foreground)]">{pkg.duration}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--foreground)]">
+                      {formatDurationMonthsToUi(pkg.durationMonths)}
+                    </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-[var(--primary)]">
                         {pkg.price.toLocaleString('vi-VN')} VNĐ
@@ -492,11 +545,12 @@ export function PackagesPage() {
                         <button
                           onClick={() => {
                             setEditingPackage(pkg);
-                            setBenefits(pkg.benefits);
+                            setBenefits(pkg.benefits || []);
                             setFormData({
+                              code: pkg.id,
                               name: pkg.name,
                               price: pkg.price.toString(),
-                              duration: pkg.duration,
+                              duration: formatDurationMonthsToUi(pkg.durationMonths),
                               type: pkg.type,
                             });
                             setShowPackageModal(true);
@@ -537,6 +591,7 @@ export function PackagesPage() {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Mã Khuyến Mãi</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Mức giảm</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Đã dùng / Tổng cộng</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Thời gian áp dụng</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Trạng thái</th>
                   <th className="px-6 py-4 text-right text-sm font-medium text-[var(--foreground)]">Hành động</th>
@@ -562,11 +617,14 @@ export function PackagesPage() {
                         <span className="font-bold text-[var(--foreground)]">
                           {voucher.discountType === 'percent'
                             ? `${voucher.discountValue}%`
-                            : `${voucher.discountValue.toLocaleString('vi-VN')} VNĐ`}
+                            : `${Number(voucher.discountValue).toLocaleString('vi-VN')} VNĐ`}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-sm text-[var(--foreground)] font-semibold">
+                        {voucher.used} / {voucher.total} lượt
+                      </td>
                       <td className="px-6 py-4 text-sm text-[var(--foreground)]">
-                        {voucher.startDate} - {voucher.endDate}
+                        {formatDbDateToUi(voucher.startDate)} - {formatDbDateToUi(voucher.endDate)}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.text}`}>
@@ -582,8 +640,9 @@ export function PackagesPage() {
                                 code: voucher.code,
                                 discountType: voucher.discountType,
                                 discountValue: voucher.discountValue.toString(),
-                                startDate: voucher.startDate,
-                                endDate: voucher.endDate,
+                                total: voucher.total.toString(),
+                                startDate: formatDbDateToUi(voucher.startDate),
+                                endDate: formatDbDateToUi(voucher.endDate),
                               });
                               setShowVoucherModal(true);
                             }}
@@ -627,8 +686,8 @@ export function PackagesPage() {
               setShowPackageModal(false);
               setEditingPackage(null);
               setBenefits([]);
-              setFormData({ name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
-              setFormErrors({ name: false, price: false, benefits: false });
+              setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+              setFormErrors({ code: false, name: false, price: false, benefits: false });
             }}
           ></div>
 
@@ -644,8 +703,8 @@ export function PackagesPage() {
                     setShowPackageModal(false);
                     setEditingPackage(null);
                     setBenefits([]);
-                    setFormData({ name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
-                    setFormErrors({ name: false, price: false, benefits: false });
+                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+                    setFormErrors({ code: false, name: false, price: false, benefits: false });
                   }}
                   className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
                 >
@@ -656,6 +715,26 @@ export function PackagesPage() {
               {/* Form */}
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                      Mã gói tập <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.code}
+                      onChange={(e) => {
+                        setFormData({ ...formData, code: e.target.value.toUpperCase() });
+                        setFormErrors({ ...formErrors, code: false });
+                      }}
+                      disabled={!!editingPackage}
+                      placeholder="VD: PKG006"
+                      className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#FF7A00] disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                        formErrors.code ? 'border-red-500' : 'border-[var(--border)]'
+                      }`}
+                    />
+                    {formErrors.code && <p className="text-xs text-red-500 mt-1">Vui lòng nhập mã gói hợp lệ (tối đa 50 ký tự)</p>}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                       Tên gói tập <span className="text-red-500">*</span>
@@ -674,6 +753,9 @@ export function PackagesPage() {
                     />
                     {formErrors.name && <p className="text-xs text-red-500 mt-1">Vui lòng nhập tên gói tập</p>}
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                       Mức giá (VNĐ) <span className="text-red-500">*</span>
@@ -692,9 +774,7 @@ export function PackagesPage() {
                     />
                     {formErrors.price && <p className="text-xs text-red-500 mt-1">Vui lòng nhập mức giá hợp lệ (lớn hơn 0)</p>}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                       Thời hạn <span className="text-red-500">*</span>
@@ -710,20 +790,21 @@ export function PackagesPage() {
                       <option>12 tháng</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                      Loại gói
-                    </label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value as 'Cơ bản' | 'VIP' | 'PT Kèm 1-1' })}
-                      className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#FF7A00]"
-                    >
-                      <option>Cơ bản</option>
-                      <option>VIP</option>
-                      <option>PT Kèm 1-1</option>
-                    </select>
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Loại gói
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#FF7A00]"
+                  >
+                    <option>Cơ bản</option>
+                    <option>VIP</option>
+                    <option>PT Kèm 1-1</option>
+                  </select>
                 </div>
 
                 {/* Benefits Section */}
@@ -780,8 +861,8 @@ export function PackagesPage() {
                     setShowPackageModal(false);
                     setEditingPackage(null);
                     setBenefits([]);
-                    setFormData({ name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
-                    setFormErrors({ name: false, price: false, benefits: false });
+                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+                    setFormErrors({ code: false, name: false, price: false, benefits: false });
                   }}
                   className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
                 >
@@ -807,8 +888,8 @@ export function PackagesPage() {
             onClick={() => {
               setShowVoucherModal(false);
               setEditingVoucher(null);
-              setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', startDate: '', endDate: '' });
-              setVoucherFormErrors({ code: false, discountValue: false, startDate: false, endDate: false });
+              setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', total: '100', startDate: '', endDate: '' });
+              setVoucherFormErrors({ code: false, discountValue: false, total: false, startDate: false, endDate: false });
             }}
           ></div>
 
@@ -823,8 +904,8 @@ export function PackagesPage() {
                   onClick={() => {
                     setShowVoucherModal(false);
                     setEditingVoucher(null);
-                    setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', startDate: '', endDate: '' });
-                    setVoucherFormErrors({ code: false, discountValue: false, startDate: false, endDate: false });
+                    setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', total: '100', startDate: '', endDate: '' });
+                    setVoucherFormErrors({ code: false, discountValue: false, total: false, startDate: false, endDate: false });
                   }}
                   className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
                 >
@@ -888,6 +969,25 @@ export function PackagesPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Tổng số lượt sử dụng tối đa <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={voucherFormData.total}
+                    onChange={(e) => {
+                      setVoucherFormData({ ...voucherFormData, total: e.target.value });
+                      setVoucherFormErrors({ ...voucherFormErrors, total: false });
+                    }}
+                    placeholder="100"
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#FF7A00] ${
+                      voucherFormErrors.total ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {voucherFormErrors.total && <p className="text-xs text-red-500 mt-1">Vui lòng nhập số lượt sử dụng hợp lệ</p>}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
@@ -905,7 +1005,7 @@ export function PackagesPage() {
                         voucherFormErrors.startDate ? 'border-red-500' : 'border-[var(--border)]'
                       }`}
                     />
-                    {voucherFormErrors.startDate && <p className="text-xs text-red-500 mt-1">Vui lòng nhập ngày bắt đầu</p>}
+                    {voucherFormErrors.startDate && <p className="text-xs text-red-500 mt-1">Vui lòng nhập ngày bắt đầu (DD/MM/YYYY)</p>}
                   </div>
 
                   <div>
@@ -924,7 +1024,7 @@ export function PackagesPage() {
                         voucherFormErrors.endDate ? 'border-red-500' : 'border-[var(--border)]'
                       }`}
                     />
-                    {voucherFormErrors.endDate && <p className="text-xs text-red-500 mt-1">Vui lòng nhập ngày kết thúc</p>}
+                    {voucherFormErrors.endDate && <p className="text-xs text-red-500 mt-1">Vui lòng nhập ngày kết thúc (DD/MM/YYYY)</p>}
                   </div>
                 </div>
               </div>
@@ -935,8 +1035,8 @@ export function PackagesPage() {
                   onClick={() => {
                     setShowVoucherModal(false);
                     setEditingVoucher(null);
-                    setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', startDate: '', endDate: '' });
-                    setVoucherFormErrors({ code: false, discountValue: false, startDate: false, endDate: false });
+                    setVoucherFormData({ code: '', discountType: 'percent', discountValue: '', total: '100', startDate: '', endDate: '' });
+                    setVoucherFormErrors({ code: false, discountValue: false, total: false, startDate: false, endDate: false });
                   }}
                   className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"
                 >

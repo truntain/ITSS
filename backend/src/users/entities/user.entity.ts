@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 export type UserRole = 'HV' | 'PT' | 'NV' | 'AD';
 export type UserGender = 'male' | 'female' | 'other';
+export type UserStatus = 'working' | 'leave' | 'quit';
 
 @Entity('users')
 export class User {
@@ -46,6 +47,9 @@ export class User {
 
   @Column({ length: 255, nullable: true })
   avatar?: string;
+
+  @Column({ name: 'status', type: 'varchar', length: 50, default: 'working' })
+  status: UserStatus;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
