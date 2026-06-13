@@ -21,6 +21,36 @@ export function UserMembershipPage() {
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const formatBenefits = (benefits: any): string[] => {
+    if (!benefits) return [];
+    if (Array.isArray(benefits)) return benefits;
+    if (typeof benefits === 'object') {
+      const translations: Record<string, string> = {
+        pool_access: 'Sử dụng bể bơi miễn phí',
+        towel_service: 'Dịch vụ khăn tắm miễn phí',
+        pt_sessions: 'buổi tập với Huấn luyện viên cá nhân (PT)',
+        gym_access: 'Truy cập phòng gym 24/7',
+        locker_access: 'Sử dụng tủ đồ thông minh',
+        water_service: 'Nước uống miễn phí',
+        sauna_access: 'Sử dụng phòng xông hơi Sauna',
+      };
+      const list: string[] = [];
+      Object.keys(benefits).forEach(key => {
+        const val = benefits[key];
+        if (val === true) {
+          list.push(translations[key] || key);
+        } else if (typeof val === 'number' && val > 0) {
+          const label = translations[key] ? `${val} ${translations[key]}` : `${key}: ${val}`;
+          list.push(label);
+        } else if (typeof val === 'string') {
+          list.push(val);
+        }
+      });
+      return list;
+    }
+    return [];
+  };
+
   const fetchData = () => {
     setLoading(true);
     const token = localStorage.getItem('token');
@@ -54,7 +84,7 @@ export function UserMembershipPage() {
             daysLeft,
             expiryDate: expiryDateFormatted,
             startDate: data.startDate,
-            benefits: data.package.benefits || [],
+            benefits: formatBenefits(data.package.benefits),
             price: data.package.price,
             durationMonths: data.package.durationMonths,
           });
@@ -73,7 +103,10 @@ export function UserMembershipPage() {
         return res.json();
       })
       .then((data: any[]) => {
-        const visiblePackages = data.filter(p => p.isVisible);
+        const visiblePackages = data.filter(p => p.isVisible).map(p => ({
+          ...p,
+          benefits: formatBenefits(p.benefits)
+        }));
         setPackages(visiblePackages);
       })
       .catch(err => {
