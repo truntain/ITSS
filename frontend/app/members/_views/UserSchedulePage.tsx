@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, Clock, User, MapPin, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ScheduleEvent {
@@ -10,54 +10,67 @@ interface ScheduleEvent {
   trainer: string;
   room: string;
   type: string;
+  status: string;
 }
 
 export function UserSchedulePage() {
-  const [currentMonth] = useState(new Date(2026, 4, 1)); // May 2026
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
+  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const scheduleEvents: ScheduleEvent[] = [
-    {
-      id: '1',
-      date: '2026-05-17',
-      time: '17:30 - 18:30',
-      trainer: 'PT Lê Minh Trọng',
-      room: 'Khu Tạ A',
-      type: 'STRENGTH CONDITIONING',
-    },
-    {
-      id: '2',
-      date: '2026-05-17',
-      time: '19:00 - 20:00',
-      trainer: 'Coach Nguyễn An',
-      room: 'Studio B',
-      type: 'HIIT CARDIO BLAST',
-    },
-    {
-      id: '3',
-      date: '2026-05-19',
-      time: '08:00 - 09:00',
-      trainer: 'Instructor Mai',
-      room: 'Phòng Yoga',
-      type: 'YOGA RECOVERY',
-    },
-    {
-      id: '4',
-      date: '2026-05-20',
-      time: '18:00 - 19:00',
-      trainer: 'PT Lê Minh Trọng',
-      room: 'Khu Tạ B',
-      type: 'STRENGTH TRAINING',
-    },
-    {
-      id: '5',
-      date: '2026-05-22',
-      time: '17:00 - 18:00',
-      trainer: 'PT Lê Minh Trọng',
-      room: 'Khu CrossFit',
-      type: 'FUNCTIONAL TRAINING',
-    },
-  ];
+  const fetchBookings = () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/bookings/my-bookings', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch bookings');
+        return res.json();
+      })
+      .then((data: any[]) => {
+        const mapped = data.map(item => ({
+          id: String(item.id),
+          date: item.date,
+          time: item.timeSlot,
+          trainer: item.pt ? `PT ${item.pt.fullName}` : 'Chưa xếp PT',
+          room: item.room || 'Chưa xếp phòng',
+          type: item.type,
+          status: item.status,
+        }));
+        setScheduleEvents(mapped);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching bookings:', err);
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchBookings();
+
+    const handleSuccess = () => {
+      fetchBookings();
+    };
+
+    window.addEventListener('booking-success', handleSuccess);
+    return () => {
+      window.removeEventListener('booking-success', handleSuccess);
+    };
+  }, []);
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
 
   // Generate calendar days
   const getDaysInMonth = (date: Date) => {
@@ -84,19 +97,60 @@ export function UserSchedulePage() {
   };
 
   const getEventsForDate = (day: number) => {
-    const dateStr = `2026-05-${String(day).padStart(2, '0')}`;
-    return scheduleEvents.filter((event) => event.date === dateStr);
+    const year = currentMonth.getFullYear();
+    const monthStr = String(currentMonth.getMonth() + 1).padStart(2, '0');
+    const dateStr = `${year}-${monthStr}-${String(day).padStart(2, '0')}`;
+    return scheduleEvents.filter((event) => event.date === dateStr && event.status !== 'cancelled');
   };
 
   const isToday = (day: number) => {
-    return day === 17; // May 17, 2026
+    const today = new Date();
+    return (
+      day === today.getDate() &&
+      currentMonth.getMonth() === today.getMonth() &&
+      currentMonth.getFullYear() === today.getFullYear()
+    );
   };
 
   const handleCancelEvent = (eventId: string) => {
-    console.log('Canceling event:', eventId);
-    setSelectedEvent(null);
-    // Show success notification
+    const confirmCancel = confirm('Bạn có chắc chắn muốn hủy lịch tập này không?');
+    if (!confirmCancel) return;
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch(`http://localhost:3001/bookings/my-bookings/${eventId}/cancel`, {
+      method: 'PATCH',
+      headers,
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to cancel booking');
+        return res.json();
+      })
+      .then(() => {
+        setScheduleEvents(prev =>
+          prev.map(evt => (evt.id === eventId ? { ...evt, status: 'cancelled' } : evt))
+        );
+        setSelectedEvent(null);
+        alert('Hủy lịch tập thành công');
+      })
+      .catch(err => {
+        console.error('Error canceling booking:', err);
+        alert('Có lỗi xảy ra khi hủy lịch tập');
+      });
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-[1440px] mx-auto px-8 py-16 flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#FF5A00]/20 border-t-[#FF5A00] rounded-full animate-spin mb-4"></div>
+        <p className="text-[#A0A0A0]">Đang tải lịch tập...</p>
+      </div>
+    );
+  }
 
   const days = getDaysInMonth(currentMonth);
   const monthName = currentMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
@@ -115,10 +169,16 @@ export function UserSchedulePage() {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-black text-white uppercase">{monthName}</h2>
           <div className="flex gap-2">
-            <button className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors">
+            <button
+              onClick={handlePrevMonth}
+              className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors"
+            >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors">
+            <button
+              onClick={handleNextMonth}
+              className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors"
+            >
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>

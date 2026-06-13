@@ -41,6 +41,25 @@ export class BookingsService {
     return this.findOne(id);
   }
 
+  async findMyBookings(userId: number) {
+    return this.bookingRepository.find({
+      where: { userId },
+      relations: { pt: true },
+      order: { date: 'DESC', timeSlot: 'ASC' },
+    });
+  }
+
+  async cancelMyBooking(bookingId: number, userId: number) {
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId, userId },
+    });
+    if (!booking) {
+      throw new NotFoundException(`Không tìm thấy lịch đặt tập với ID #${bookingId} của hội viên này`);
+    }
+    booking.status = 'cancelled';
+    return this.bookingRepository.save(booking);
+  }
+
   async remove(id: number) {
     const booking = await this.findOne(id);
     await this.bookingRepository.remove(booking);

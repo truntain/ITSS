@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { FeedbacksService } from './feedbacks.service';
 import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { UpdateFeedbackDto } from './dto/update-feedback.dto';
@@ -19,6 +19,13 @@ export class FeedbacksController {
   @ApiOperation({ summary: 'Hội viên gửi phản hồi góp ý mới (Member)' })
   create(@Body() createFeedbackDto: CreateFeedbackDto) {
     return this.feedbacksService.create(createFeedbackDto);
+  }
+
+  @Get('my-feedbacks')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem danh sách phản hồi góp ý của bản thân hội viên' })
+  findMyFeedbacks(@Request() req: any) {
+    return this.feedbacksService.findMyFeedbacks(req.user.id);
   }
 
   @Get()

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
@@ -56,6 +56,13 @@ export class MembershipsController {
   @ApiOperation({ summary: 'Đăng ký/Mua gói tập (Admin/Nhân viên/Hội viên)' })
   create(@Body() createMembershipDto: CreateMembershipDto) {
     return this.membershipsService.create(createMembershipDto);
+  }
+
+  @Get('my-active')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem thông tin đăng ký hội viên đang hoạt động của bản thân hội viên' })
+  async findMyActive(@Request() req: any) {
+    return this.membershipsService.findActiveByUserId(req.user.id);
   }
 
   @Get()

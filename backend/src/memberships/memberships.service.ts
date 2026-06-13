@@ -58,6 +58,31 @@ export class MembershipsService {
     // Validate package exists
     await this.findOnePackage(createMembershipDto.packageId);
 
+    // Check if there is an active membership for this user
+    const activeMembership = await this.findActiveByUserId(createMembershipDto.userId);
+    let extraDays = 0;
+    if (activeMembership) {
+      const remainingTime = new Date(activeMembership.endDate).getTime() - Date.now();
+      if (remainingTime > 0) {
+        extraDays = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
+      }
+
+      // Expire/deactivate the old active membership
+      activeMembership.status = 'expired';
+      await this.membershipRepository.save(activeMembership);
+    }
+
+    // Calculate start date and end date
+    if (extraDays > 0) {
+      const endDate = new Date(createMembershipDto.endDate);
+      endDate.setDate(endDate.getDate() + extraDays);
+
+      const y = endDate.getFullYear();
+      const m = String(endDate.getMonth() + 1).padStart(2, '0');
+      const d = String(endDate.getDate()).padStart(2, '0');
+      createMembershipDto.endDate = `${y}-${m}-${d}`;
+    }
+
     const membership = this.membershipRepository.create(createMembershipDto);
     return this.membershipRepository.save(membership);
   }

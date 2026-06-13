@@ -1,17 +1,27 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Mail, Phone, Calendar, Ruler, Lock, Upload, Save } from 'lucide-react';
+import { toast } from 'sonner';
+
+const roleLabels: Record<string, string> = {
+  HV: 'Hội viên GymPro',
+  PT: 'Huấn luyện viên',
+  NV: 'Nhân viên',
+  AD: 'Quản trị viên',
+};
 
 export function UserProfilePage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
+  const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState({
-    fullName: 'Trương Thế Thành',
-    phone: '0901234567',
-    email: 'truongthethanhgymgmail.com',
-    birthDate: '1995-03-15',
+    fullName: '',
+    phone: '',
+    email: '',
+    birthDate: '',
     gender: 'male',
-    height: '175',
+    height: '',
+    role: 'HV',
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -26,9 +36,86 @@ export function UserProfilePage() {
     confirmPassword: false,
   });
 
+  const fetchProfile = () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/auth/profile', { headers })
+      .then((res) => {
+        if (!res.ok) throw new Error('Không thể tải thông tin cá nhân');
+        return res.json();
+      })
+      .then((data) => {
+        setProfileData({
+          fullName: data.fullName || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          birthDate: data.birthDate ? data.birthDate.split('T')[0] : '',
+          gender: data.gender || 'male',
+          height: data.height ? String(Math.round(Number(data.height))) : '',
+          role: data.role || 'HV',
+        });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error('Lỗi khi tải thông tin hồ sơ');
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
   const handleSaveProfile = () => {
-    console.log('Saving profile:', profileData);
-    // Show success notification
+    if (!profileData.fullName || !profileData.phone) {
+      toast.error('Họ tên và số điện thoại không được để trống!');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/auth/profile', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        fullName: profileData.fullName,
+        phone: profileData.phone,
+        birthDate: profileData.birthDate || null,
+        gender: profileData.gender,
+        height: profileData.height ? Number(profileData.height) : null,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Không thể cập nhật hồ sơ');
+        return res.json();
+      })
+      .then((updated) => {
+        toast.success('Cập nhật hồ sơ thành công!');
+        const currentUserStr = localStorage.getItem('currentUser');
+        if (currentUserStr) {
+          const currentUser = JSON.parse(currentUserStr);
+          currentUser.fullName = updated.fullName;
+          currentUser.phone = updated.phone;
+          localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        }
+        fetchProfile();
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error('Lỗi khi cập nhật hồ sơ');
+      });
   };
 
   const handleChangePassword = () => {
@@ -40,12 +127,56 @@ export function UserProfilePage() {
 
     setErrors(newErrors);
 
-    if (!Object.values(newErrors).some((error) => error)) {
-      console.log('Changing password');
-      // Reset form
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    if (Object.values(newErrors).some((error) => error)) {
+      if (newErrors.confirmPassword) {
+        toast.error('Mật khẩu xác nhận không khớp!');
+      } else {
+        toast.error('Vui lòng điền đầy đủ thông tin!');
+      }
+      return;
     }
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/auth/change-password', {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Không thể đổi mật khẩu');
+        }
+        return res.json();
+      })
+      .then(() => {
+        toast.success('Đổi mật khẩu thành công!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err.message || 'Lỗi khi đổi mật khẩu');
+      });
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-[1440px] mx-auto px-8 py-12 flex flex-col items-center justify-center min-h-[400px] text-[#A0A0A0]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF5A00] mb-4"></div>
+        <p className="text-sm">Đang tải thông tin cá nhân...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1440px] mx-auto px-8 py-12">
@@ -87,14 +218,24 @@ export function UserProfilePage() {
               <div className="w-32 h-32 bg-gradient-to-br from-[#FF5A00] to-[#FF8C00] rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(255,90,0,0.4)]">
                 <User className="w-16 h-16 text-white" />
               </div>
-              <button className="absolute bottom-0 right-0 w-10 h-10 bg-[#FF5A00] rounded-full flex items-center justify-center shadow-lg hover:bg-[#FF6A10] transition-colors">
+              <button 
+                type="button"
+                onClick={() => toast.info('Tính năng thay đổi ảnh đại diện đang được phát triển')}
+                className="absolute bottom-0 right-0 w-10 h-10 bg-[#FF5A00] rounded-full flex items-center justify-center shadow-lg hover:bg-[#FF6A10] transition-colors"
+              >
                 <Upload className="w-5 h-5 text-white" />
               </button>
             </div>
             <div>
               <h2 className="text-2xl font-black text-white mb-1">{profileData.fullName}</h2>
-              <p className="text-[#FF5A00] font-bold uppercase text-sm">Hội viên Premium</p>
-              <button className="mt-3 text-sm text-[#A0A0A0] hover:text-white flex items-center gap-2 transition-colors">
+              <p className="text-[#FF5A00] font-bold uppercase text-sm">
+                {roleLabels[profileData.role] || 'Hội viên GymPro'}
+              </p>
+              <button 
+                type="button"
+                onClick={() => toast.info('Tính năng thay đổi ảnh đại diện đang được phát triển')}
+                className="mt-3 text-sm text-[#A0A0A0] hover:text-white flex items-center gap-2 transition-colors"
+              >
                 <Upload className="w-4 h-4" />
                 Thay đổi ảnh đại diện
               </button>
@@ -133,14 +274,14 @@ export function UserProfilePage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-bold text-white mb-2 uppercase">Email</label>
+              <label className="block text-sm font-bold text-[#A0A0A0] mb-2 uppercase">Email (Không thể thay đổi)</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#A0A0A0]" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#666666]" />
                 <input
                   type="email"
                   value={profileData.email}
-                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                  className="w-full pl-12 pr-4 py-3 bg-[#1A1A1A] border border-[#333333] text-white focus:border-[#FF5A00] focus:outline-none transition-colors"
+                  disabled
+                  className="w-full pl-12 pr-4 py-3 bg-[#161616] border border-[#262626] text-[#666666] cursor-not-allowed focus:outline-none"
                 />
               </div>
             </div>
