@@ -1,9 +1,12 @@
-"use client";
+﻿"use client";
 
 import { Search, UserPlus, ChevronRight, AlertCircle, DollarSign, Calendar, X, TrendingUp, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Customer {
   id: string;
@@ -55,7 +58,7 @@ export function CustomersPage() {
 
   const fetchCustomers = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/customers', {
+    fetch(`${API_BASE}/customers`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(async (res) => {
@@ -83,7 +86,7 @@ export function CustomersPage() {
 
   const fetchPackages = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/memberships/packages', {
+    fetch(`${API_BASE}/memberships/packages`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => {
@@ -104,7 +107,7 @@ export function CustomersPage() {
   const handleViewDetails = (customerId: string) => {
     setDetailLoading(true);
     const token = localStorage.getItem('token');
-    fetch(`http://localhost:3001/customers/${customerId}`, {
+    fetch(`${API_BASE}/customers/${customerId}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => {
@@ -137,7 +140,7 @@ export function CustomersPage() {
     }
 
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/customers', {
+    fetch(`${API_BASE}/customers`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

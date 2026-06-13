@@ -1,9 +1,12 @@
-"use client";
+﻿"use client";
 
 import { Search, UserPlus, X, Mail, Phone, Calendar, Activity, ChevronDown, Check } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Employee {
   id: string;
@@ -157,7 +160,7 @@ export function EmployeesPage() {
     const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
     const endDateStr = today.toISOString().split('T')[0];
 
-    fetch(`http://localhost:3001/work-shifts?startDate=${startDateStr}&endDate=${endDateStr}&employeeId=${selectedEmployee.id}`, {
+    fetch(`${API_BASE}/work-shifts?startDate=${startDateStr}&endDate=${endDateStr}&employeeId=${selectedEmployee.id}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => {
@@ -297,7 +300,7 @@ export function EmployeesPage() {
 
   const fetchEmployees = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/staffs', {
+    fetch(`${API_BASE}/staffs`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(async (res) => {
@@ -377,7 +380,7 @@ export function EmployeesPage() {
     }
 
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/staffs', {
+    fetch(`${API_BASE}/staffs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -422,7 +425,7 @@ export function EmployeesPage() {
     const token = localStorage.getItem('token');
     const dbStatus = newStatus === 'Đang làm việc' ? 'working' : newStatus === 'Nghỉ phép' ? 'leave' : 'quit';
 
-    fetch(`http://localhost:3001/staffs/${employeeId}`, {
+    fetch(`${API_BASE}/staffs/${employeeId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

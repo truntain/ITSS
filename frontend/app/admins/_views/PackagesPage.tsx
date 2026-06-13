@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { Search, Plus, Edit, Trash2, Tag, Dumbbell, X, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Pagination } from '@/components/Pagination';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = 'http://localhost:3001';
 
 interface Package {
   id: string;

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Star, Send, Paperclip, X, Filter, MessageCircle, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -34,7 +34,7 @@ export function SupportPage() {
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
   const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API_BASE = 'http://localhost:3001';
   const getToken = () => localStorage.getItem('token') || '';
 
   const getCurrentUser = () => {

@@ -155,7 +155,6 @@ export class CustomersService {
       return {
         date: dateObj.toLocaleDateString('vi-VN'),
         time: dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        duration: '1h 30p', // Mock thời gian tập
       };
     });
 

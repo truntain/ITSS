@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from 'react';
 import { DollarSign, Users, UserPlus, AlertCircle, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -87,7 +87,7 @@ export function NewDashboard() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    fetch('http://localhost:3001/admin/dashboard/summary', { headers })
+    fetch(`${'http://localhost:3001'}/admin/dashboard/summary`, { headers })
       .then(async (res) => {
         if (!res.ok) {
           if (res.status === 401) {

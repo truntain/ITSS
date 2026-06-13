@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Search, Tag, Check, CreditCard, Banknote, Building2, QrCode, X, CheckCircle } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';

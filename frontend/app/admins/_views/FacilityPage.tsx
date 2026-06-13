@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { Upload, Save, Plus, Trash2, X, Building2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = 'http://localhost:3001';
 
 interface Facility {
   id: number;

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { TrendingUp, TrendingDown, Download, DollarSign, CreditCard, Users, Package } from 'lucide-react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -39,7 +39,7 @@ export function RevenuePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const API_BASE = 'http://localhost:3001';
   const getToken = () => localStorage.getItem('token') || '';
 
   const fetchTransactions = useCallback(async () => {
@@ -118,7 +118,7 @@ export function RevenuePage() {
       result.push({
         month: `T${mMonth + 1}`,
         revenue: revenue,
-        target: 40000000 + (mMonth % 3) * 10000000, // Mục tiêu giả lập từ 40M - 65M
+        // target đã bị xóa - không có dữ liệu thực từ DB
       });
     }
     return result;

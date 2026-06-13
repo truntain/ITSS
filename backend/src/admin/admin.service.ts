@@ -94,23 +94,23 @@ export class AdminService {
     // 1. All-time revenue
     const allTimeRevenueResult = await this.transactionRepository
       .createQueryBuilder('t')
-      .select('SUM(t.final_amount)', 'sum')
+      .select('SUM(t.finalAmount)', 'sum')
       .getRawOne();
     const allTimeRevenue = parseFloat(allTimeRevenueResult?.sum || '0');
 
     // 2. This month revenue
     const thisMonthRevenueResult = await this.transactionRepository
       .createQueryBuilder('t')
-      .select('SUM(t.final_amount)', 'sum')
-      .where('t.transaction_date >= :start', { start: startOfThisMonth })
+      .select('SUM(t.finalAmount)', 'sum')
+      .where('t.transactionDate >= :start', { start: startOfThisMonth })
       .getRawOne();
     const thisMonthRevenue = parseFloat(thisMonthRevenueResult?.sum || '0');
 
     // 3. Last month revenue
     const lastMonthRevenueResult = await this.transactionRepository
       .createQueryBuilder('t')
-      .select('SUM(t.final_amount)', 'sum')
-      .where('t.transaction_date >= :start AND t.transaction_date <= :end', { start: startOfLastMonth, end: endOfLastMonth })
+      .select('SUM(t.finalAmount)', 'sum')
+      .where('t.transactionDate >= :start AND t.transactionDate <= :end', { start: startOfLastMonth, end: endOfLastMonth })
       .getRawOne();
     const lastMonthRevenue = parseFloat(lastMonthRevenueResult?.sum || '0');
 

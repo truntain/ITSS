@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from 'react';
 import { QrCode, Fingerprint, CheckCircle, Clock, Calendar, Shield } from 'lucide-react';
@@ -32,7 +32,7 @@ export function UserCheckinPage() {
     }
 
     // Fetch status (today check-in status and active membership info)
-    fetch('http://localhost:3001/checkins/my-status', { headers })
+    fetch(`${'http://localhost:3001'}/checkins/my-status`, { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch status');
         return res.json();
@@ -49,7 +49,7 @@ export function UserCheckinPage() {
       });
 
     // Fetch checkin history
-    fetch('http://localhost:3001/checkins/my-history', { headers })
+    fetch(`${'http://localhost:3001'}/checkins/my-history`, { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch history');
         return res.json();

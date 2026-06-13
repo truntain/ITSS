@@ -1,8 +1,11 @@
-"use client";
+﻿"use client";
 
 import { ChevronLeft, ChevronRight, Copy, MapPin, Plus, X, Trash } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { addWeeks, startOfWeek, format, isSameDay, addDays, differenceInWeeks } from 'date-fns';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface ShiftEvent {
   id: string;
@@ -146,7 +149,7 @@ export function SchedulePage() {
 
   const fetchStaffs = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/staffs', {
+    fetch(`${API_BASE}/staffs`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -167,7 +170,7 @@ export function SchedulePage() {
     const endDate = format(addDays(currentWeekStart, 6), 'yyyy-MM-dd');
     setLoading(true);
     const token = localStorage.getItem('token');
-    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+    fetch(`${API_BASE}/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -299,7 +302,7 @@ export function SchedulePage() {
     };
 
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/work-shifts', {
+    fetch(`${API_BASE}/work-shifts`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -329,7 +332,7 @@ export function SchedulePage() {
     if (!window.confirm('Bạn có chắc chắn muốn xóa ca trực này không?')) return;
 
     const token = localStorage.getItem('token');
-    fetch(`http://localhost:3001/work-shifts/${id}`, {
+    fetch(`${API_BASE}/work-shifts/${id}`, {
       method: 'DELETE',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
@@ -349,7 +352,7 @@ export function SchedulePage() {
     const endDate = format(addDays(lastWeekStart, 6), 'yyyy-MM-dd');
     const token = localStorage.getItem('token');
 
-    fetch(`http://localhost:3001/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
+    fetch(`${API_BASE}/work-shifts?startDate=${startDate}&endDate=${endDate}`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => res.json())
@@ -371,7 +374,7 @@ export function SchedulePage() {
           };
         });
 
-        return fetch('http://localhost:3001/work-shifts/bulk', {
+        return fetch(`${API_BASE}/work-shifts/bulk`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',

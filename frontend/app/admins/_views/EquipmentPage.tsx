@@ -1,8 +1,11 @@
-"use client";
+﻿"use client";
 
 import { Dumbbell, AlertTriangle, Wrench, X, Camera, Plus, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Pagination } from '@/components/Pagination';
+
+const API_BASE = 'http://localhost:3001';
+
 
 interface Equipment {
   id: string;
@@ -69,7 +72,7 @@ export function EquipmentPage() {
 
   const fetchFacilities = useCallback(() => {
     const token = localStorage.getItem('token');
-    fetch('http://localhost:3001/facilities', {
+    fetch(`${API_BASE}/facilities`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => {
@@ -85,7 +88,7 @@ export function EquipmentPage() {
   const fetchEquipments = useCallback(() => {
     const token = localStorage.getItem('token');
     setLoading(true);
-    fetch('http://localhost:3001/facilities/equipment/list', {
+    fetch(`${API_BASE}/facilities/equipment/list`, {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(async (res) => {
@@ -160,7 +163,7 @@ export function EquipmentPage() {
       lastMaintenance: lastMaintenanceDate,
     };
 
-    fetch('http://localhost:3001/facilities/equipment/create', {
+    fetch(`${API_BASE}/facilities/equipment/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -217,7 +220,7 @@ export function EquipmentPage() {
     };
 
     Promise.all([
-      fetch('http://localhost:3001/facilities/reports/create', {
+      fetch(`${API_BASE}/facilities/reports/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -225,7 +228,7 @@ export function EquipmentPage() {
         },
         body: JSON.stringify(reportBody),
       }),
-      fetch(`http://localhost:3001/facilities/equipment/${showReportModal.dbId}`, {
+      fetch(`${API_BASE}/facilities/equipment/${showReportModal.dbId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -265,7 +268,7 @@ export function EquipmentPage() {
     const dbId = showConfirmFixModal.dbId;
 
     const promises = [
-      fetch(`http://localhost:3001/facilities/equipment/${dbId}`, {
+      fetch(`${API_BASE}/facilities/equipment/${dbId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -280,7 +283,7 @@ export function EquipmentPage() {
 
     if (reportId) {
       promises.push(
-        fetch(`http://localhost:3001/facilities/reports/${reportId}`, {
+        fetch(`${API_BASE}/facilities/reports/${reportId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
