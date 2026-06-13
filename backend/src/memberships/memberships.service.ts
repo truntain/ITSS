@@ -102,4 +102,12 @@ export class MembershipsService {
       order: { endDate: 'DESC' },
     });
   }
+
+  async findMostRecentByUserId(userId: number) {
+    return this.membershipRepository.findOne({
+      where: { userId },
+      relations: { package: true },
+      order: { endDate: 'DESC' },
+    });
+  }
 }

@@ -1,24 +1,14 @@
 "use client";
 
 import { Search, Tag, Check, CreditCard, Banknote, Building2, QrCode, X, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
-const members = [
-  { id: 'KH001', name: 'Nguyễn Văn An', phone: '0901234567' },
-  { id: 'KH002', name: 'Trần Thị Bình', phone: '0902345678' },
-  { id: 'KH003', name: 'Lê Minh Cường', phone: '0903456789' },
-];
-
-const packages = [
-  { id: 'PKG001', name: 'Gói 1 tháng', price: 500000, duration: '30 ngày' },
-  { id: 'PKG002', name: 'Gói 3 tháng', price: 1350000, duration: '90 ngày' },
-  { id: 'PKG003', name: 'Gói 1 năm', price: 4800000, duration: '365 ngày' },
-  { id: 'PKG004', name: 'Gói VIP PT', price: 6000000, duration: '90 ngày + PT' },
-];
+// Mock data removed. Data loaded dynamically from the backend APIs.
 
 export function StaffSalesPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMember, setSelectedMember] = useState('');
+  const [selectedMember, setSelectedMember] = useState<string | number>('');
   const [selectedPackage, setSelectedPackage] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [discount, setDiscount] = useState(0);
@@ -26,26 +16,132 @@ export function StaffSalesPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  const [members, setMembers] = useState<any[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    Promise.all([
+      fetch('http://localhost:3001/users/members', { headers }).then(res => res.json()),
+      fetch('http://localhost:3001/memberships/packages', { headers }).then(res => res.json())
+    ])
+      .then(([membersData, packagesData]) => {
+        const formattedMembers = Array.isArray(membersData)
+          ? membersData.map((m: any) => ({
+              ...m,
+              name: m.fullName
+            }))
+          : [];
+        setMembers(formattedMembers);
+
+        const formattedPackages = Array.isArray(packagesData)
+          ? packagesData.map((pkg: any) => ({
+              ...pkg,
+              price: Number(pkg.price),
+              duration: `${pkg.durationMonths} tháng`
+            }))
+          : [];
+        setPackages(formattedPackages);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error loading sales page data:', err);
+        setLoading(false);
+      });
+  }, []);
+
   const filteredMembers = members.filter(m =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.phone.includes(searchTerm)
   );
 
-  const selectedMemberData = members.find(m => m.id === selectedMember);
+  const selectedMemberData = members.find(m => m.id === Number(selectedMember));
   const selectedPackageData = packages.find(p => p.id === selectedPackage);
 
   const subtotal = selectedPackageData?.price || 0;
-  const total = subtotal - discount;
+  const total = Math.max(0, subtotal - discount);
 
   const handleApplyVoucher = () => {
-    if (voucherCode.toUpperCase() === 'WELCOME10') {
-      setDiscount(subtotal * 0.1);
-    } else if (voucherCode.toUpperCase() === 'VIP20') {
-      setDiscount(subtotal * 0.2);
-    } else {
-      setDiscount(0);
-    }
+    if (!voucherCode) return;
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch(`http://localhost:3001/payments/vouchers/code/${voucherCode}`, { headers })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Mã giảm giá không hợp lệ!');
+        }
+        return data;
+      })
+      .then(voucher => {
+        let calculatedDiscount = 0;
+        if (voucher.discountType === 'percent') {
+          calculatedDiscount = (subtotal * Number(voucher.discountValue)) / 100;
+        } else {
+          calculatedDiscount = Number(voucher.discountValue);
+        }
+        setDiscount(calculatedDiscount);
+        setSelectedVoucher(voucher);
+        toast.success(`Áp dụng voucher thành công! Giảm ${calculatedDiscount.toLocaleString('vi-VN')}đ`);
+      })
+      .catch(err => {
+        setDiscount(0);
+        setSelectedVoucher(null);
+        toast.error(err.message || 'Không áp dụng được voucher!');
+      });
   };
+
+  const handleConfirmCheckout = () => {
+    if (!selectedMember || !selectedPackage) return;
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const payload = {
+      userId: Number(selectedMember),
+      packageId: selectedPackage,
+      voucherCode: selectedVoucher ? selectedVoucher.code : undefined,
+      paymentMethod
+    };
+
+    fetch('http://localhost:3001/payments/checkout', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Thanh toán thất bại!');
+        }
+        return data;
+      })
+      .then(() => {
+        setShowConfirmModal(false);
+        setShowSuccessModal(true);
+        toast.success('Thanh toán thành công!');
+      })
+      .catch(err => {
+        setShowConfirmModal(false);
+        toast.error(err.message || 'Có lỗi xảy ra khi thanh toán!');
+      });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+        <span className="ml-3 text-[var(--muted-foreground)]">Đang tải dữ liệu...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -78,7 +174,9 @@ export function StaffSalesPage() {
                   className="w-full p-3 bg-[var(--background)] hover:bg-[var(--secondary)] rounded-lg border border-[var(--border)] transition-colors text-left"
                 >
                   <p className="font-medium text-[var(--foreground)]">{member.name}</p>
-                  <p className="text-xs text-[var(--muted-foreground)]">{member.phone}</p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    HV{String(member.id).padStart(3, '0')} · {member.phone}
+                  </p>
                 </button>
               ))}
             </div>
@@ -86,7 +184,9 @@ export function StaffSalesPage() {
 
           {selectedMemberData && !searchTerm && (
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <p className="font-medium text-[var(--foreground)]">{selectedMemberData.name}</p>
+              <p className="font-medium text-[var(--foreground)]">
+                {selectedMemberData.name} (HV{String(selectedMemberData.id).padStart(3, '0')})
+              </p>
               <p className="text-sm text-[var(--muted-foreground)]">{selectedMemberData.phone}</p>
             </div>
           )}
@@ -247,9 +347,13 @@ export function StaffSalesPage() {
           {/* QR Code */}
           {paymentMethod === 'transfer' && (
             <div className="mb-6 p-4 bg-[var(--background)] rounded-lg border border-[var(--border)]">
-              <p className="text-sm text-[var(--muted-foreground)] mb-3 text-center">Quét mã QR để thanh toán</p>
-              <div className="w-48 h-48 mx-auto bg-white rounded-lg border-2 border-[var(--border)] flex items-center justify-center">
-                <QrCode className="w-32 h-32 text-gray-300" />
+              <p className="text-sm text-[var(--muted-foreground)] mb-3 text-center">Quét mã VNPay QR để thanh toán</p>
+              <div className="w-48 h-48 mx-auto bg-white rounded-lg border-2 border-[var(--border)] overflow-hidden flex items-center justify-center">
+                <img
+                  src="/vnpay_vibrant_qr.png"
+                  alt="VNPay QR Code thanh toán"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <p className="text-xs text-center text-[var(--muted-foreground)] mt-3">
                 GymPro • {total.toLocaleString('vi-VN')}đ
@@ -284,7 +388,7 @@ export function StaffSalesPage() {
                   Quay lại
                 </button>
                 <button
-                  onClick={() => { setShowConfirmModal(false); setShowSuccessModal(true); }}
+                  onClick={handleConfirmCheckout}
                   className="flex-1 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors"
                 >
                   Chắc chắn
@@ -313,6 +417,7 @@ export function StaffSalesPage() {
                   setSelectedPackage('');
                   setVoucherCode('');
                   setDiscount(0);
+                  setSelectedVoucher(null);
                 }}
                 className="px-6 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-colors"
               >

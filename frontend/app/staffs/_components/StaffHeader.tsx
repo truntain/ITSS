@@ -51,7 +51,7 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
                 onClick={() => setShowMenu(!showMenu)}
                 className="flex items-center gap-2 p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-[var(--primary)] to-orange-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-xs">NV</span>
                 </div>
                 <div className="text-left hidden sm:block">
@@ -101,7 +101,7 @@ export function StaffHeader({ pageTitle, onLogout }: StaffHeaderProps) {
             </div>
             <div className="p-5">
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-[var(--primary)] to-orange-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-xl">NV</span>
                 </div>
                 <div>
