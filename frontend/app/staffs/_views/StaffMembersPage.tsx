@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, User, Phone, Calendar, Package, Clock, ChevronRight, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, User, Phone, Calendar, Package, Clock, ChevronRight, X, CheckCircle, AlertCircle, Plus, Edit2, Pause, Play } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Member {
   id: string;
+  dbId: number;
   name: string;
   phone: string;
   email: string;
@@ -17,67 +19,9 @@ interface Member {
   ptSessions: number;
   totalCheckins: number;
   lastCheckin: string;
+  history?: { date: string; action: string; detail: string }[];
+  membershipId?: number | null;
 }
-
-const MEMBERS: Member[] = [
-  {
-    id: 'HV001', name: 'Nguyễn Thị Bích', phone: '0901234567', email: 'bich.nguyen@email.com',
-    gender: 'Nữ', dob: '15/03/1995', joinDate: '01/01/2024',
-    package: 'Gói Premium 12 tháng', packageExpiry: '01/01/2025',
-    status: 'active', ptSessions: 12, totalCheckins: 48, lastCheckin: '08/06/2024',
-  },
-  {
-    id: 'HV002', name: 'Trần Minh Khoa', phone: '0912345678', email: 'khoa.tran@email.com',
-    gender: 'Nam', dob: '22/07/1990', joinDate: '15/03/2024',
-    package: 'Gói Standard 3 tháng', packageExpiry: '15/06/2024',
-    status: 'expired', ptSessions: 0, totalCheckins: 22, lastCheckin: '01/06/2024',
-  },
-  {
-    id: 'HV003', name: 'Lê Thanh Hương', phone: '0923456789', email: 'huong.le@email.com',
-    gender: 'Nữ', dob: '08/11/1998', joinDate: '10/04/2024',
-    package: 'PT 1-1 (20 buổi)', packageExpiry: '10/07/2024',
-    status: 'active', ptSessions: 20, totalCheckins: 15, lastCheckin: '08/06/2024',
-  },
-  {
-    id: 'HV004', name: 'Phạm Đức Long', phone: '0934567890', email: 'long.pham@email.com',
-    gender: 'Nam', dob: '30/05/1987', joinDate: '01/05/2024',
-    package: 'Gói VIP 6 tháng', packageExpiry: '01/11/2024',
-    status: 'active', ptSessions: 8, totalCheckins: 30, lastCheckin: '07/06/2024',
-  },
-  {
-    id: 'HV005', name: 'Võ Thu Ngân', phone: '0945678901', email: 'ngan.vo@email.com',
-    gender: 'Nữ', dob: '12/09/2000', joinDate: '20/02/2024',
-    package: 'Gói Standard 3 tháng', packageExpiry: '20/05/2024',
-    status: 'suspended', ptSessions: 0, totalCheckins: 8, lastCheckin: '15/05/2024',
-  },
-];
-
-const historyData: Record<string, { date: string; action: string; detail: string }[]> = {
-  HV001: [
-    { date: '08/06/2024', action: 'Check-in', detail: '07:32 – Buổi tập sáng' },
-    { date: '05/06/2024', action: 'Check-in', detail: '18:10 – Buổi tập chiều' },
-    { date: '01/06/2024', action: 'Gia hạn gói', detail: 'Gói Premium 12 tháng – 4.800.000đ' },
-    { date: '03/06/2024', action: 'PT Session', detail: 'Buổi PT #12 với Minh Anh' },
-    { date: '28/05/2024', action: 'Check-in', detail: '09:00 – Buổi tập sáng' },
-  ],
-  HV002: [
-    { date: '01/06/2024', action: 'Check-in', detail: '17:45 – Buổi tập chiều' },
-    { date: '15/03/2024', action: 'Đăng ký gói', detail: 'Gói Standard 3 tháng – 1.350.000đ' },
-  ],
-  HV003: [
-    { date: '08/06/2024', action: 'PT Session', detail: 'Buổi PT #15 với Minh Anh' },
-    { date: '06/06/2024', action: 'Check-in', detail: '08:00 – Buổi tập sáng' },
-  ],
-  HV004: [
-    { date: '07/06/2024', action: 'Check-in', detail: '06:30 – Buổi tập sáng' },
-    { date: '05/06/2024', action: 'PT Session', detail: 'Buổi PT #8 với Văn Hùng' },
-    { date: '01/05/2024', action: 'Đăng ký gói', detail: 'Gói VIP 6 tháng – 3.200.000đ' },
-  ],
-  HV005: [
-    { date: '15/05/2024', action: 'Check-in', detail: '10:00 – Buổi tập' },
-    { date: '20/02/2024', action: 'Đăng ký gói', detail: 'Gói Standard 3 tháng – 1.350.000đ' },
-  ],
-};
 
 const statusStyle: Record<Member['status'], string> = {
   active: 'bg-green-500/15 text-green-400 border-green-500/20',
@@ -94,8 +38,172 @@ export function StaffMembersPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | Member['status']>('all');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [membersList, setMembersList] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = MEMBERS.filter((m) => {
+  // Modals state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    gender: 'male',
+    birthDate: '',
+    password: '',
+  });
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    dbId: 0,
+    fullName: '',
+    email: '',
+    phone: '',
+    gender: 'male',
+    birthDate: '',
+  });
+
+  const fetchMembers = () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch('http://localhost:3001/users/members-detailed', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setMembersList(data);
+          if (selectedMember) {
+            const updated = data.find(m => m.dbId === selectedMember.dbId);
+            if (updated) {
+              setSelectedMember(updated);
+            }
+          }
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching members:', err);
+        toast.error('Không thể tải danh sách hội viên');
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
+  const handleCreateMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.fullName || !addForm.email || !addForm.phone) {
+      toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc!');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    fetch('http://localhost:3001/users/members', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(addForm),
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Không thể tạo hội viên');
+        return data;
+      })
+      .then(() => {
+        toast.success('Thêm hội viên mới thành công!');
+        setShowAddModal(false);
+        setAddForm({
+          fullName: '',
+          email: '',
+          phone: '',
+          gender: 'male',
+          birthDate: '',
+          password: '',
+        });
+        fetchMembers();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Có lỗi xảy ra!');
+      });
+  };
+
+  const handleUpdateMember = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.fullName || !editForm.email || !editForm.phone) {
+      toast.error('Vui lòng điền đầy đủ các thông tin bắt buộc!');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const payload = {
+      fullName: editForm.fullName,
+      email: editForm.email,
+      phone: editForm.phone,
+      gender: editForm.gender,
+      birthDate: editForm.birthDate || undefined,
+    };
+
+    fetch(`http://localhost:3001/users/members/${editForm.dbId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Không thể cập nhật hội viên');
+        return data;
+      })
+      .then(() => {
+        toast.success('Cập nhật thông tin hội viên thành công!');
+        setShowEditModal(false);
+        fetchMembers();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Có lỗi xảy ra!');
+      });
+  };
+
+  const handleToggleMembershipStatus = (membershipId: number, currentStatus: string) => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const nextStatus = currentStatus === 'active' ? 'paused' : 'active';
+    const actionText = nextStatus === 'paused' ? 'Tạm ngừng' : 'Kích hoạt lại';
+
+    fetch(`http://localhost:3001/memberships/${membershipId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: nextStatus }),
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `Không thể ${actionText.toLowerCase()} gói tập`);
+        return data;
+      })
+      .then(() => {
+        toast.success(`${actionText} gói tập thành công!`);
+        fetchMembers();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Có lỗi xảy ra!');
+      });
+  };
+
+  const filtered = membersList.filter((m) => {
     const matchSearch =
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.phone.includes(search) ||
@@ -104,20 +212,38 @@ export function StaffMembersPage() {
     return matchSearch && matchStatus;
   });
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+        <span className="ml-3 text-[var(--muted-foreground)]">Đang tải danh sách hội viên...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-5 h-[calc(100vh-120px)]">
       {/* Left: Member List */}
       <div className="w-80 flex-shrink-0 flex flex-col gap-3">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
-          <input
-            type="text"
-            placeholder="Tên, SĐT, mã hội viên..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--card)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
-          />
+        {/* Search & Add */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
+            <input
+              type="text"
+              placeholder="Tên, SĐT, mã..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[var(--card)] border border-[var(--border)] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-xl flex items-center justify-center transition-colors shadow-sm"
+            title="Thêm hội viên"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
         </div>
         {/* Status filter */}
         <div className="flex gap-1.5">
@@ -195,12 +321,39 @@ export function StaffMembersPage() {
                   </div>
                   <p className="text-[var(--muted-foreground)] text-sm mt-0.5">{selectedMember.id}</p>
                 </div>
-                <button
-                  onClick={() => setSelectedMember(null)}
-                  className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors text-[var(--muted-foreground)]"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      let formattedDob = '';
+                      if (selectedMember.dob && selectedMember.dob !== 'Không rõ') {
+                        const parts = selectedMember.dob.split('/');
+                        if (parts.length === 3) {
+                          formattedDob = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                        }
+                      }
+                      
+                      setEditForm({
+                        dbId: selectedMember.dbId,
+                        fullName: selectedMember.name,
+                        email: selectedMember.email,
+                        phone: selectedMember.phone,
+                        gender: selectedMember.gender === 'Nam' ? 'male' : selectedMember.gender === 'Nữ' ? 'female' : 'other',
+                        birthDate: formattedDob,
+                      });
+                      setShowEditModal(true);
+                    }}
+                    className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+                    title="Chỉnh sửa thông tin"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedMember(null)}
+                    className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors text-[var(--muted-foreground)]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -258,11 +411,33 @@ export function StaffMembersPage() {
                   ) : (
                     <AlertCircle className="w-5 h-5 text-red-500" />
                   )}
-                  <span className={`font-bold text-sm ${selectedMember.status === 'active' ? 'text-green-500' : 'text-red-500'}`}>
-                    {selectedMember.status === 'active' ? 'Gói đang hiệu lực' : 'Gói đã hết hạn'}
+                  <span className={`font-bold text-sm ${selectedMember.status === 'active' ? 'text-green-500' : selectedMember.status === 'suspended' ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {selectedMember.status === 'active' ? 'Gói đang hiệu lực' : selectedMember.status === 'suspended' ? 'Gói đang tạm ngừng' : 'Gói đã hết hạn'}
                   </span>
                 </div>
               </div>
+
+              {selectedMember.membershipId && (selectedMember.status === 'active' || selectedMember.status === 'suspended') && (
+                <div className="mt-3">
+                  {selectedMember.status === 'active' ? (
+                    <button
+                      onClick={() => handleToggleMembershipStatus(selectedMember.membershipId!, 'active')}
+                      className="w-full py-3 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 text-yellow-500 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Pause className="w-4 h-4" />
+                      Tạm ngừng gói tập (Đóng băng)
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleToggleMembershipStatus(selectedMember.membershipId!, 'paused')}
+                      className="w-full py-3 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-500 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Kích hoạt lại gói tập
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Service History */}
@@ -272,7 +447,7 @@ export function StaffMembersPage() {
                 Lịch sử sử dụng dịch vụ
               </h3>
               <div className="space-y-2">
-                {(historyData[selectedMember.id] || []).map((item, idx) => (
+                {(selectedMember.history || []).map((item, idx) => (
                   <div key={idx} className="flex items-center gap-4 p-3 rounded-xl hover:bg-[var(--secondary)] transition-colors">
                     <div className="w-2 h-2 rounded-full bg-[var(--primary)] flex-shrink-0" />
                     <span className="text-[var(--muted-foreground)] text-xs w-24 flex-shrink-0">{item.date}</span>
@@ -292,6 +467,195 @@ export function StaffMembersPage() {
           </div>
         )}
       </div>
+
+      {/* Add Member Modal */}
+      {showAddModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setShowAddModal(false)} />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 max-w-md w-full relative">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="absolute top-4 right-4 p-1.5 hover:bg-[var(--secondary)] rounded-lg text-[var(--muted-foreground)] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-lg font-bold text-[var(--foreground)] mb-5">Thêm hội viên mới</h3>
+              <form onSubmit={handleCreateMember} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Họ và tên *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.fullName}
+                    onChange={(e) => setAddForm({ ...addForm, fullName: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.phone}
+                    onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
+                    placeholder="0987654321"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={addForm.email}
+                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Giới tính</label>
+                    <select
+                      value={addForm.gender}
+                      onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Ngày sinh</label>
+                    <input
+                      type="date"
+                      value={addForm.birthDate}
+                      onChange={(e) => setAddForm({ ...addForm, birthDate: e.target.value })}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Mật khẩu (mặc định: 123456)</label>
+                  <input
+                    type="password"
+                    value={addForm.password}
+                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] placeholder:text-[var(--muted-foreground)]"
+                    placeholder="Mật khẩu tài khoản"
+                  />
+                </div>
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 py-2 bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl font-bold text-sm transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-xl font-bold text-sm transition-colors shadow-md"
+                  >
+                    Thêm mới
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit Member Modal */}
+      {showEditModal && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setShowEditModal(false)} />
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 max-w-md w-full relative">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="absolute top-4 right-4 p-1.5 hover:bg-[var(--secondary)] rounded-lg text-[var(--muted-foreground)] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-lg font-bold text-[var(--foreground)] mb-5">Chỉnh sửa thông tin hội viên</h3>
+              <form onSubmit={handleUpdateMember} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Họ và tên *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.fullName}
+                    onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Giới tính</label>
+                    <select
+                      value={editForm.gender}
+                      onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    >
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Ngày sinh</label>
+                    <input
+                      type="date"
+                      value={editForm.birthDate}
+                      onChange={(e) => setEditForm({ ...editForm, birthDate: e.target.value })}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="flex-1 py-2 bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-xl font-bold text-sm transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-xl font-bold text-sm transition-colors shadow-md"
+                  >
+                    Lưu thay đổi
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

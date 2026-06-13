@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star, Send, MessageSquare } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Feedback {
   id: number;
@@ -10,29 +11,123 @@ interface Feedback {
   time: string;
   stars: number;
   full: string;
+  replyContent?: string;
+  status: 'pending' | 'responded';
 }
 
-const FEEDBACKS: Feedback[] = [
-  { id: 1, sender: 'Nguyễn Thị Bích', preview: 'Máy chạy bộ số 2 phát ra tiếng ồn lớn...', time: '10:24', stars: 2, full: 'Máy chạy bộ số 2 phát ra tiếng ồn rất lớn khi chạy tốc độ cao. Tôi đã phải chuyển sang máy khác. Mong phòng tập kiểm tra và sửa chữa sớm.' },
-  { id: 2, sender: 'Trần Minh Khoa', preview: 'Phòng tắm khu nam bị rò nước ở vòi...', time: '09:51', stars: 3, full: 'Phòng tắm khu nam bị rò nước ở vòi số 3, nước chảy liên tục dù đã khóa vòi. Khá bất tiện cho các thành viên.' },
-  { id: 3, sender: 'Lê Thanh Hương', preview: 'Dịch vụ PT rất tốt, coach Minh Tuấn...', time: '09:12', stars: 5, full: 'Dịch vụ PT rất tốt, coach Minh Tuấn hỗ trợ nhiệt tình và chuyên nghiệp. Rất hài lòng với lịch tập được lên kế hoạch chi tiết.' },
-  { id: 4, sender: 'Phạm Quốc Hùng', preview: 'Quầy lễ tân xử lý nhanh, thái độ...', time: 'Hôm qua', stars: 5, full: 'Quầy lễ tân xử lý nhanh, thái độ phục vụ rất chuyên nghiệp và thân thiện. Cảm ơn đội ngũ nhân viên!' },
-  { id: 5, sender: 'Võ Thu Ngân', preview: 'Phòng yoga thiếu thảm, chỉ có 8/15...', time: 'Hôm qua', stars: 3, full: 'Phòng yoga thiếu thảm, chỉ có 8/15 thảm có thể dùng được. Mong phòng tập bổ sung thêm dụng cụ.' },
-];
-
 export function StaffFeedbackPage() {
+  const [feedbacksList, setFeedbacksList] = useState<Feedback[]>([]);
   const [selected, setSelected] = useState<Feedback | null>(null);
   const [reply, setReply] = useState('');
-  const [resolved, setResolved] = useState<Set<number>>(new Set([4, 5]));
+  const [loading, setLoading] = useState(true);
+  const [currentStaffId, setCurrentStaffId] = useState<number | undefined>(undefined);
 
-  const handleResolve = () => {
-    if (!selected) return;
-    setResolved((prev) => new Set([...prev, selected.id]));
-    setReply('');
-    setSelected(null);
+  const fetchFeedbacks = () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch('http://localhost:3001/feedbacks', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const mapped = data.map((fb: any) => {
+            const dateObj = new Date(fb.createdAt);
+            const timeStr = `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+            const dateStr = dateObj.toLocaleDateString('vi-VN');
+            const formattedTime = `${timeStr} – ${dateStr}`;
+
+            return {
+              id: fb.id,
+              sender: fb.user?.fullName || 'Hội viên ẩn danh',
+              preview: fb.content.length > 40 ? fb.content.substring(0, 40) + '...' : fb.content,
+              time: formattedTime,
+              stars: (fb.id % 3) + 3, // simulated rating (3, 4, 5)
+              full: fb.content,
+              replyContent: fb.replyContent,
+              status: fb.status,
+            };
+          });
+          setFeedbacksList(mapped);
+          
+          if (selected) {
+            const updated = mapped.find(f => f.id === selected.id);
+            if (updated) {
+              setSelected(updated);
+            }
+          }
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching feedbacks:', err);
+        toast.error('Không thể tải danh sách phản hồi');
+        setLoading(false);
+      });
   };
 
-  const pendingCount = FEEDBACKS.filter((f) => !resolved.has(f.id)).length;
+  useEffect(() => {
+    fetchFeedbacks();
+
+    // Parse current staff user ID
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.id) {
+          setCurrentStaffId(Number(user.id));
+        }
+      } catch (e) {
+        console.error('Error parsing current user:', e);
+      }
+    }
+  }, []);
+
+  const handleResolve = () => {
+    if (!selected || !reply.trim()) return;
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const payload = {
+      replyContent: reply.trim(),
+      status: 'responded',
+      replierId: currentStaffId,
+    };
+
+    fetch(`http://localhost:3001/feedbacks/${selected.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload)
+    })
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Gửi câu trả lời thất bại');
+        return data;
+      })
+      .then(() => {
+        toast.success('Đã gửi trả lời và đóng ticket phản hồi!');
+        setReply('');
+        fetchFeedbacks();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Có lỗi xảy ra!');
+      });
+  };
+
+  const pendingCount = feedbacksList.filter((f) => f.status === 'pending').length;
+
+  if (loading && feedbacksList.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+        <span className="ml-3 text-[var(--muted-foreground)]">Đang tải phản hồi góp ý...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-5 gap-5">
@@ -42,8 +137,8 @@ export function StaffFeedbackPage() {
           <h2 className="text-sm font-bold text-[var(--foreground)]">Phản hồi hội viên</h2>
           <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{pendingCount} chưa xử lý</span>
         </div>
-        {FEEDBACKS.map((fb) => {
-          const isResolved = resolved.has(fb.id);
+        {feedbacksList.map((fb) => {
+          const isResolved = fb.status === 'responded';
           const isSelected = selected?.id === fb.id;
           return (
             <button
@@ -85,8 +180,8 @@ export function StaffFeedbackPage() {
                 <h3 className="font-bold text-[var(--foreground)]">{selected.sender}</h3>
                 <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{selected.time}</p>
               </div>
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${resolved.has(selected.id) ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                {resolved.has(selected.id) ? 'Đã giải quyết' : 'Chưa xử lý'}
+              <span className={`text-xs font-bold px-2 py-1 rounded-full ${selected.status === 'responded' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                {selected.status === 'responded' ? 'Đã giải quyết' : 'Chưa xử lý'}
               </span>
             </div>
 
@@ -102,7 +197,7 @@ export function StaffFeedbackPage() {
               <p className="text-sm text-[var(--foreground)] leading-relaxed">{selected.full}</p>
             </div>
 
-            {!resolved.has(selected.id) ? (
+            {selected.status === 'pending' ? (
               <>
                 <div>
                   <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1.5 block">Trả lời khách hàng</label>
@@ -124,8 +219,11 @@ export function StaffFeedbackPage() {
                 </button>
               </>
             ) : (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
-                <p className="text-emerald-700 font-semibold text-sm">✓ Ticket này đã được xử lý</p>
+              <div className="space-y-3">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                  <p className="text-emerald-700 font-semibold text-xs mb-1">✓ Đã phản hồi hội viên</p>
+                  <p className="text-sm text-emerald-900 italic">“ {selected.replyContent} ”</p>
+                </div>
               </div>
             )}
           </div>

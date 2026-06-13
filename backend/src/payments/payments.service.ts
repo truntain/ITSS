@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { CheckoutDto } from './dto/checkout.dto';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UpdateVoucherDto } from './dto/update-voucher.dto';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -24,6 +25,7 @@ export class PaymentsService {
     private readonly membershipRepository: Repository<Membership>,
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // --- Voucher CRUD ---
@@ -184,5 +186,132 @@ export class PaymentsService {
     const transaction = await this.findOne(id);
     await this.transactionRepository.remove(transaction);
     return { message: 'Xóa giao dịch thành công' };
+  }
+
+  // --- Voucher lookup and validation ---
+  async findOneVoucherByCode(code: string) {
+    const voucher = await this.voucherRepository.findOne({
+      where: { code: code.toUpperCase() },
+    });
+    if (!voucher) {
+      throw new NotFoundException(`Mã giảm giá không tồn tại!`);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (voucher.status !== 'active' || todayStr < voucher.startDate || todayStr > voucher.endDate) {
+      throw new BadRequestException('Mã giảm giá đã hết hạn hoặc không hoạt động!');
+    }
+
+    if (voucher.used >= voucher.total) {
+      throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng!');
+    }
+
+    return voucher;
+  }
+
+  // --- Checkout ---
+  async checkout(dto: CheckoutDto, cashierId?: number) {
+    return this.dataSource.transaction(async (manager) => {
+      // 1. Verify User
+      const user = await manager.findOne(User, { where: { id: dto.userId } });
+      if (!user) {
+        throw new BadRequestException(`Không tìm thấy người dùng với ID #${dto.userId}`);
+      }
+
+      // 2. Verify Package
+      const pkg = await manager.findOne(Package, { where: { id: dto.packageId } });
+      if (!pkg) {
+        throw new BadRequestException(`Không tìm thấy gói tập với ID #${dto.packageId}`);
+      }
+
+      // 3. Verify and handle Voucher (if code is provided)
+      let voucher: Voucher | null = null;
+      let discount = 0;
+      if (dto.voucherCode) {
+        voucher = await manager.findOne(Voucher, { where: { code: dto.voucherCode.toUpperCase() } });
+        if (!voucher) {
+          throw new BadRequestException(`Mã giảm giá không tồn tại!`);
+        }
+        if (voucher.status !== 'active') {
+          throw new BadRequestException('Mã giảm giá không hoạt động!');
+        }
+        if (voucher.used >= voucher.total) {
+          throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng!');
+        }
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (todayStr < voucher.startDate || todayStr > voucher.endDate) {
+          throw new BadRequestException('Mã giảm giá đã hết hạn sử dụng!');
+        }
+
+        // Calculate discount
+        if (voucher.discountType === 'percent') {
+          discount = (Number(pkg.price) * Number(voucher.discountValue)) / 100;
+        } else {
+          discount = Number(voucher.discountValue);
+        }
+
+        // Increment usage
+        voucher.used += 1;
+        if (voucher.used >= voucher.total) {
+          voucher.status = 'depleted';
+        }
+        await manager.save(Voucher, voucher);
+      }
+
+      // 4. Calculate Membership Dates
+      const startDate = new Date();
+      const startDateStr = startDate.toISOString().split('T')[0];
+      
+      const endDate = new Date();
+      endDate.setMonth(startDate.getMonth() + pkg.durationMonths);
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Sessions check
+      let totalSessions = 0;
+      if (pkg.benefits && typeof pkg.benefits === 'object' && typeof pkg.benefits.sessions === 'number') {
+        totalSessions = pkg.benefits.sessions;
+      } else if (pkg.id.toLowerCase().includes('pt') || pkg.name.toLowerCase().includes('pt')) {
+        totalSessions = 20; // Default sessions for PT packages
+      }
+
+      // Create Membership
+      const membership = new Membership();
+      membership.userId = user.id;
+      membership.packageId = pkg.id;
+      membership.startDate = startDateStr;
+      membership.endDate = endDateStr;
+      membership.totalSessions = totalSessions;
+      membership.remainingSessions = totalSessions;
+      membership.status = 'active';
+      const savedMembership = await manager.save(Membership, membership);
+
+      // Generate receipt number
+      const receiptNo = `BILL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // 5. Create Transaction
+      const transaction = new Transaction();
+      transaction.receiptNo = receiptNo;
+      transaction.userId = user.id;
+      transaction.membershipId = savedMembership.id;
+      transaction.packageId = pkg.id;
+      if (voucher) {
+        transaction.voucherId = voucher.id;
+      }
+      transaction.originalAmount = Number(pkg.price);
+      transaction.discountAmount = discount;
+      transaction.finalAmount = Number(pkg.price) - discount;
+      transaction.paymentMethod = dto.paymentMethod === 'cash' ? 'Tiền mặt' : dto.paymentMethod === 'card' ? 'Quẹt thẻ' : 'Chuyển khoản';
+      if (cashierId) {
+        transaction.cashierId = cashierId;
+      }
+      transaction.transactionDate = new Date();
+      const savedTransaction = await manager.save(Transaction, transaction);
+
+      return {
+        membership: savedMembership,
+        transaction: savedTransaction,
+      };
+    });
   }
 }

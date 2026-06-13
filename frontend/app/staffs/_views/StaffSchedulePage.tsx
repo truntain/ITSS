@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellDot, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
 
 type ViewMode = 'month' | 'week';
 
@@ -14,14 +15,6 @@ const shiftStyle = {
 };
 
 interface Notice { id: number; title: string; body: string; time: string; tag: string; tagClass: string }
-
-const NOTICES: Notice[] = [
-  { id: 1, title: 'Chương trình khuyến mãi lễ 30/4 – 1/5', body: 'Giảm 20% tất cả gói tập từ 28/4 đến 02/5. Áp dụng mã HOLIDAY20 tại quầy.', time: '05/06', tag: 'Khuyến mãi', tagClass: 'bg-orange-100 text-orange-700' },
-  { id: 2, title: 'Nội quy mới về đồng phục nhân viên', body: 'Từ ngày 10/06, toàn bộ nhân viên phải mặc áo polo xanh có logo GymPro khi làm việc.', time: '04/06', tag: 'Nội quy', tagClass: 'bg-blue-100 text-blue-700' },
-  { id: 3, title: 'Đào tạo kỹ năng bán hàng tháng 6', body: 'Buổi đào tạo kỹ năng sales sẽ tổ chức vào 14/06 lúc 09:00 tại phòng họp. Bắt buộc tham dự.', time: '03/06', tag: 'Đào tạo', tagClass: 'bg-purple-100 text-purple-700' },
-  { id: 4, title: 'Cập nhật quy trình xử lý check-in', body: 'Từ hôm nay, mọi trường hợp gói hết hạn cần báo Admin ngay thay vì tự xử lý.', time: '01/06', tag: 'Quy trình', tagClass: 'bg-emerald-100 text-emerald-700' },
-  { id: 5, title: 'Kết quả thi đua tháng 5/2026', body: 'Nguyễn Văn A dẫn đầu với 42 giao dịch. Chúc mừng!', time: '31/05', tag: 'Thông báo', tagClass: 'bg-slate-100 text-slate-600' },
-];
 
 const DAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const MONTH_NAMES = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -43,18 +36,31 @@ function startOfWeek(d: Date) {
 }
 
 export function StaffSchedulePage() {
-  const TODAY = new Date(2026, 5, 6); // June 6 2026
+  const TODAY = new Date();
   const [view, setView] = useState<ViewMode>('month');
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 5, 1)); // June 2026
+  const [currentMonth, setCurrentMonth] = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(TODAY));
-  const [readSet, setReadSet] = useState<Set<number>>(new Set([4, 5]));
+  const [readSet, setReadSet] = useState<Set<number>>(new Set());
   const [selectedDate, setSelectedDate] = useState<string | null>(toKey(TODAY));
 
   const [shifts, setShifts] = useState<ShiftDay[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [noticesList, setNoticesList] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Initialize readSet from localStorage in useEffect
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('read_notices');
+      if (saved) {
+        try {
+          setReadSet(new Set(JSON.parse(saved)));
+        } catch (e) {
+          console.error('Failed to parse read notices:', e);
+        }
+      }
+    }
+
     const userStr = localStorage.getItem('currentUser');
     if (userStr) {
       try {
@@ -102,12 +108,75 @@ export function StaffSchedulePage() {
       });
   }, [selectedEmployeeId]);
 
+  const fetchAnnouncements = () => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch('http://localhost:3001/announcements', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const mapped = data.map((item: any) => {
+            const dateObj = new Date(item.createdAt);
+            const timeStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+
+            // Calculate tag & tagClass dynamically based on title keywords
+            const titleLower = item.title.toLowerCase();
+            let tag = 'Thông báo';
+            let tagClass = 'bg-slate-100 text-slate-600';
+
+            if (titleLower.includes('khuyến mãi') || titleLower.includes('giảm giá') || titleLower.includes('voucher') || titleLower.includes('ưu đãi')) {
+              tag = 'Khuyến mãi';
+              tagClass = 'bg-orange-100 text-orange-700';
+            } else if (titleLower.includes('nội quy') || titleLower.includes('đồng phục') || titleLower.includes('quy định')) {
+              tag = 'Nội quy';
+              tagClass = 'bg-blue-100 text-blue-700';
+            } else if (titleLower.includes('đào tạo') || titleLower.includes('tập huấn') || titleLower.includes('học')) {
+              tag = 'Đào tạo';
+              tagClass = 'bg-purple-100 text-purple-700';
+            } else if (titleLower.includes('quy trình') || titleLower.includes('hướng dẫn')) {
+              tag = 'Quy trình';
+              tagClass = 'bg-emerald-100 text-emerald-700';
+            }
+
+            return {
+              id: item.id,
+              title: item.title,
+              body: item.content,
+              time: timeStr,
+              tag,
+              tagClass,
+            };
+          });
+          setNoticesList(mapped);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching announcements:', err);
+      });
+  };
+
   useEffect(() => {
-    fetchShifts();
-  }, [fetchShifts]);
+    if (selectedEmployeeId) {
+      fetchShifts();
+    }
+  }, [selectedEmployeeId, fetchShifts]);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
+  const handleReadNotice = (noticeId: number) => {
+    setReadSet(prev => {
+      const next = new Set(prev);
+      next.add(noticeId);
+      localStorage.setItem('read_notices', JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
 
   const shiftMap = new Map(shifts.map(s => [s.date, s]));
-  const unreadCount = NOTICES.filter(n => !readSet.has(n.id)).length;
+  const unreadCount = noticesList.filter(n => !readSet.has(n.id)).length;
 
   // ---- MONTH VIEW ----
   const renderMonth = () => {
@@ -291,22 +360,26 @@ export function StaffSchedulePage() {
               <span className="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCount} mới</span>
             )}
           </div>
-          <div className="space-y-2">
-            {NOTICES.map(notice => {
-              const isRead = readSet.has(notice.id);
-              return (
-                <button key={notice.id} onClick={() => setReadSet(prev => new Set([...prev, notice.id]))}
-                  className={`w-full text-left p-3 rounded-lg border transition-all ${isRead ? 'border-[var(--border)] bg-[var(--background)]' : 'border-orange-200 bg-orange-50'}`}>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${notice.tagClass}`}>{notice.tag}</span>
-                    <span className="text-[10px] text-[var(--muted-foreground)]">{notice.time}</span>
-                  </div>
-                  <p className={`text-xs font-semibold mb-0.5 ${isRead ? 'text-[var(--muted-foreground)]' : 'text-[var(--foreground)]'}`}>{notice.title}</p>
-                  <p className="text-[10px] text-[var(--muted-foreground)] line-clamp-2 leading-relaxed">{notice.body}</p>
-                  {!isRead && <div className="w-1.5 h-1.5 bg-orange-500 rounded-full mt-1.5" />}
-                </button>
-              );
-            })}
+          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            {noticesList.length > 0 ? (
+              noticesList.map(notice => {
+                const isRead = readSet.has(notice.id);
+                return (
+                  <button key={notice.id} onClick={() => handleReadNotice(notice.id)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${isRead ? 'border-[var(--border)] bg-[var(--background)]' : 'border-orange-200 bg-orange-50'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${notice.tagClass}`}>{notice.tag}</span>
+                      <span className="text-[10px] text-[var(--muted-foreground)]">{notice.time}</span>
+                    </div>
+                    <p className={`text-xs font-semibold mb-0.5 ${isRead ? 'text-[var(--muted-foreground)]' : 'text-[var(--foreground)]'}`}>{notice.title}</p>
+                    <p className="text-[10px] text-[var(--muted-foreground)] line-clamp-2 leading-relaxed">{notice.body}</p>
+                    {!isRead && <div className="w-1.5 h-1.5 bg-orange-500 rounded-full mt-1.5" />}
+                  </button>
+                );
+              })
+            ) : (
+              <p className="text-xs text-[var(--muted-foreground)] text-center py-6">Không có thông báo mới nào.</p>
+            )}
           </div>
         </div>
       </div>

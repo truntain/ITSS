@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Req } from '@nestjs/common';
+import { CheckoutDto } from './dto/checkout.dto';
 import { PaymentsService } from './payments.service';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UpdateVoucherDto } from './dto/update-voucher.dto';
@@ -48,6 +49,22 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Xóa voucher (Admin)' })
   removeVoucher(@Param('id') id: string) {
     return this.paymentsService.removeVoucher(+id);
+  }
+
+  // --- Checkout Endpoints ---
+  @Get('vouchers/code/:code')
+  @Roles('AD', 'NV', 'HV')
+  @ApiOperation({ summary: 'Kiểm tra thông tin voucher qua mã code' })
+  findOneByCode(@Param('code') code: string) {
+    return this.paymentsService.findOneVoucherByCode(code);
+  }
+
+  @Post('checkout')
+  @Roles('AD', 'NV')
+  @ApiOperation({ summary: 'Thực hiện thanh toán gói tập cho hội viên' })
+  checkout(@Body() dto: CheckoutDto, @Req() req: any) {
+    const cashierId = req.user?.id;
+    return this.paymentsService.checkout(dto, cashierId);
   }
 
   // --- Transaction Endpoints ---

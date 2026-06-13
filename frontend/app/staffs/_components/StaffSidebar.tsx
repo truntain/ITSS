@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { QrCode, ShoppingCart, MessageSquare, CalendarDays, Dumbbell, Users } from 'lucide-react';
 
 interface StaffSidebarProps {
@@ -16,6 +17,19 @@ const menuItems = [
 ];
 
 export function StaffSidebar({ activeMenu, onMenuClick }: StaffSidebarProps) {
+  const [user, setUser] = useState<{ id: number; fullName: string; email: string; phone: string; role: string } | null>(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
   return (
     <div className="w-64 bg-[var(--sidebar)] h-screen flex flex-col border-r border-[var(--sidebar-border)] fixed left-0 top-0 shadow-sm">
       <div className="p-6 border-b border-[var(--sidebar-border)]">
@@ -60,7 +74,7 @@ export function StaffSidebar({ activeMenu, onMenuClick }: StaffSidebarProps) {
             <span className="text-white font-medium text-sm">NV</span>
           </div>
           <div className="flex-1">
-            <p className="text-[var(--foreground)] text-sm font-medium">Nguyễn Văn A</p>
+            <p className="text-[var(--foreground)] text-sm font-medium">{user?.fullName || 'Nguyễn Văn A'}</p>
             <p className="text-[var(--muted-foreground)] text-xs">Ca: 06:00 – 14:00</p>
           </div>
         </div>
@@ -68,3 +82,4 @@ export function StaffSidebar({ activeMenu, onMenuClick }: StaffSidebarProps) {
     </div>
   );
 }
+

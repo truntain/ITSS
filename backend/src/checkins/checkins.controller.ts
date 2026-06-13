@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { CheckinsService } from './checkins.service';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { UpdateCheckinDto } from './dto/update-checkin.dto';
@@ -17,14 +17,31 @@ export class CheckinsController {
   @Post()
   @Roles('NV')
   @ApiOperation({ summary: 'Nhân viên thực hiện điểm danh cho hội viên (Staff)' })
-  create(@Body() createCheckinDto: CreateCheckinDto) {
+  create(@Body() createCheckinDto: CreateCheckinDto, @Request() req: any) {
+    if (!createCheckinDto.checkedInBy) {
+      createCheckinDto.checkedInBy = req.user?.id;
+    }
     return this.checkinsService.create(createCheckinDto);
+  }
+
+  @Get('verify-member/:idOrCode')
+  @Roles('NV', 'AD')
+  @ApiOperation({ summary: 'Kiểm tra thông tin thẻ hội viên trước khi điểm danh (Staff)' })
+  verifyMember(@Param('idOrCode') idOrCode: string) {
+    return this.checkinsService.verifyMemberCheckin(idOrCode);
+  }
+
+  @Get('today-stats')
+  @Roles('NV', 'AD')
+  @ApiOperation({ summary: 'Lấy thống kê điểm danh hôm nay' })
+  getTodayStats() {
+    return this.checkinsService.getTodayStats();
   }
 
   @Get()
   @ApiOperation({ summary: 'Xem toàn bộ danh sách điểm danh' })
-  findAll() {
-    return this.checkinsService.findAll();
+  findAll(@Query('date') date?: string) {
+    return this.checkinsService.findAll(date);
   }
 
   @Get('my-history')

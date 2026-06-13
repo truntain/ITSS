@@ -15,7 +15,7 @@ export class MembershipsService {
     private readonly packageRepository: Repository<Package>,
     @InjectRepository(Membership)
     private readonly membershipRepository: Repository<Membership>,
-  ) {}
+  ) { }
 
   // --- Package CRUD ---
   async createPackage(createPackageDto: CreatePackageDto) {
@@ -130,6 +130,14 @@ export class MembershipsService {
 
   async findAllByUserId(userId: number) {
     return this.membershipRepository.find({
+      where: { userId },
+      relations: { package: true },
+      order: { endDate: 'DESC' },
+    });
+  }
+
+  async findMostRecentByUserId(userId: number) {
+    return this.membershipRepository.findOne({
       where: { userId },
       relations: { package: true },
       order: { endDate: 'DESC' },
