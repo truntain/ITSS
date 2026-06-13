@@ -3,12 +3,36 @@ import { X, Crown, Calendar, DollarSign, Check, Clock, TrendingUp } from 'lucide
 interface PackageDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentPackage?: {
+    name: string;
+    startDate?: string;
+    expiryDate: string;
+    daysLeft: number;
+    price: string;
+    benefits: string[];
+    durationMonths: number;
+  } | null;
 }
 
-export function PackageDetailModal({ isOpen, onClose }: PackageDetailModalProps) {
+export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageDetailModalProps) {
   if (!isOpen) return null;
 
-  const packageDetails = {
+  const packageDetails = currentPackage ? {
+    name: currentPackage.name,
+    status: 'Đang hoạt động',
+    startDate: currentPackage.startDate || 'N/A',
+    expiryDate: currentPackage.expiryDate,
+    daysLeft: currentPackage.daysLeft,
+    totalDays: currentPackage.durationMonths * 30 || 30,
+    price: Number(currentPackage.price).toLocaleString('vi-VN'),
+    benefits: currentPackage.benefits,
+    usageStats: {
+      ptSessionsUsed: 0,
+      ptSessionsTotal: 0,
+      classesAttended: 0,
+      totalCheckIns: 0,
+    },
+  } : {
     name: 'PREMIUM 12 THÁNG',
     status: 'Đang hoạt động',
     startDate: '20/05/2025',

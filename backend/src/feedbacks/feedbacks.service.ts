@@ -47,6 +47,14 @@ export class FeedbacksService {
     return this.findOne(id);
   }
 
+  async findMyFeedbacks(userId: number) {
+    return this.feedbackRepository.find({
+      where: { userId },
+      relations: { replier: true },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async remove(id: number) {
     const feedback = await this.findOne(id);
     await this.feedbackRepository.remove(feedback);

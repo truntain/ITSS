@@ -1,59 +1,89 @@
-import { X, CreditCard, Smartphone, Building2 } from 'lucide-react';
-import { useState } from 'react';
+import { X } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  packageId: string;
   packageName: string;
   price: string;
   duration: string;
   isRenewal?: boolean;
+  onPaymentSuccess?: () => void;
 }
 
-type PaymentMethod = 'momo' | 'vnpay' | 'bank' | null;
-
-export function PaymentModal({ isOpen, onClose, packageName, price, duration, isRenewal = false }: PaymentModalProps) {
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>(null);
-
+export function PaymentModal({
+  isOpen,
+  onClose,
+  packageId,
+  packageName,
+  price,
+  duration,
+  isRenewal = false,
+  onPaymentSuccess,
+}: PaymentModalProps) {
   if (!isOpen) return null;
+
+  const formatYYYYMMDD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const date = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${date}`;
+  };
 
   const today = new Date();
   const startDate = today.toLocaleDateString('vi-VN');
   const endDate = new Date(today.setMonth(today.getMonth() + parseInt(duration))).toLocaleDateString('vi-VN');
 
   const handleConfirmPayment = () => {
-    if (!selectedMethod) {
-      alert('Vui lòng chọn phương thức thanh toán');
+    const currentUserStr = localStorage.getItem('currentUser');
+    if (!currentUserStr) {
+      alert('Không tìm thấy thông tin người dùng đăng nhập');
       return;
     }
-    console.log('Processing payment:', { packageName, price, method: selectedMethod });
-    // Handle payment processing here
-    onClose();
-  };
+    const currentUser = JSON.parse(currentUserStr);
 
-  const paymentMethods = [
-    {
-      id: 'momo' as PaymentMethod,
-      name: 'MoMo',
-      description: 'Ví điện tử MoMo',
-      icon: Smartphone,
-      color: '#A50064',
-    },
-    {
-      id: 'vnpay' as PaymentMethod,
-      name: 'VNPAY',
-      description: 'Cổng thanh toán VNPAY',
-      icon: CreditCard,
-      color: '#0066B3',
-    },
-    {
-      id: 'bank' as PaymentMethod,
-      name: 'Chuyển khoản',
-      description: 'Chuyển khoản ngân hàng',
-      icon: Building2,
-      color: '#10B981',
-    },
-  ];
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const tDate = new Date();
+    const startDateStr = formatYYYYMMDD(tDate);
+    const end = new Date();
+    end.setMonth(end.getMonth() + parseInt(duration));
+    const endDateStr = formatYYYYMMDD(end);
+
+    const body = {
+      userId: currentUser.id,
+      packageId: packageId,
+      startDate: startDateStr,
+      endDate: endDateStr,
+    };
+
+    fetch('http://localhost:3001/memberships', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Đăng ký gói tập thất bại');
+        return res.json();
+      })
+      .then(() => {
+        alert('Chờ xác nhận');
+        if (onPaymentSuccess) {
+          onPaymentSuccess();
+        }
+        onClose();
+      })
+      .catch((err) => {
+        console.error('Lỗi thanh toán/đăng ký:', err);
+        alert('Có lỗi xảy ra trong quá trình xử lý giao dịch');
+      });
+  };
 
   return (
     <>
@@ -118,52 +148,26 @@ export function PaymentModal({ isOpen, onClose, packageName, price, duration, is
               </div>
             </div>
 
-            {/* Section 2: Payment Methods */}
+            {/* Section 2: QR Code Payment */}
             <div>
               <h4 className="text-lg font-black text-white uppercase mb-4 flex items-center gap-2">
                 <div className="w-1 h-6 bg-[#FF5A00]"></div>
-                Phương thức thanh toán
+                Quét mã QR thanh toán
               </h4>
-              <div className="grid grid-cols-1 gap-4">
-                {paymentMethods.map((method) => {
-                  const Icon = method.icon;
-                  const isSelected = selectedMethod === method.id;
-
-                  return (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedMethod(method.id)}
-                      className={`relative bg-[#1A1A1A] border-2 p-6 transition-all text-left ${
-                        isSelected
-                          ? 'border-[#FF5A00] shadow-[0_0_25px_rgba(255,90,0,0.5)]'
-                          : 'border-[#333333] hover:border-[#FF5A00]/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-16 h-16 rounded-lg flex items-center justify-center ${
-                            isSelected ? 'bg-[#FF5A00]' : 'bg-[#242424]'
-                          }`}
-                        >
-                          <Icon
-                            className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-[#A0A0A0]'}`}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <p className={`text-xl font-black mb-1 ${isSelected ? 'text-[#FF5A00]' : 'text-white'}`}>
-                            {method.name}
-                          </p>
-                          <p className="text-[#A0A0A0] text-sm">{method.description}</p>
-                        </div>
-                        {isSelected && (
-                          <div className="w-6 h-6 rounded-full bg-[#FF5A00] flex items-center justify-center">
-                            <div className="w-3 h-3 rounded-full bg-white"></div>
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="bg-[#1A1A1A] border border-[#333333] p-6 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="bg-white p-4 rounded-xl shadow-lg border border-[#FF5A00]/20">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                      `GymPro: ${packageName} (${duration}) - ${price} VNĐ`
+                    )}`}
+                    alt="QR Code thanh toán"
+                    className="w-48 h-48"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-white font-bold text-sm">Quét mã QR bằng ứng dụng ngân hàng hoặc ví điện tử</p>
+                  <p className="text-[#A0A0A0] text-xs">Sau khi quét mã và chuyển khoản thành công, vui lòng nhấn "Xác nhận thanh toán" bên dưới.</p>
+                </div>
               </div>
             </div>
 
@@ -179,19 +183,16 @@ export function PaymentModal({ isOpen, onClose, packageName, price, duration, is
 
               <div className="flex gap-4">
                 <button
+                  type="button"
                   onClick={onClose}
                   className="flex-1 px-6 py-4 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white font-bold uppercase transition-all"
                 >
                   Hủy đơn hàng
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmPayment}
-                  disabled={!selectedMethod}
-                  className={`flex-1 px-6 py-4 font-black uppercase transition-all ${
-                    selectedMethod
-                      ? 'bg-[#FF5A00] hover:bg-[#FF6A10] text-white shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)]'
-                      : 'bg-[#333333] text-[#666666] cursor-not-allowed'
-                  }`}
+                  className="flex-1 px-6 py-4 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all"
                 >
                   Xác nhận thanh toán
                 </button>

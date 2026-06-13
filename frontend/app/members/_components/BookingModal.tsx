@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { X, Calendar, Clock, User, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Calendar, Clock, User, Check, Search } from 'lucide-react';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -12,29 +12,135 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedPT, setSelectedPT] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [trainers, setTrainers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const trainers = [
-    { id: 'pt1', name: 'PT Lê Minh Trọng', specialty: 'Strength & Conditioning' },
-    { id: 'pt2', name: 'Coach Nguyễn An', specialty: 'HIIT & Cardio' },
-    { id: 'pt3', name: 'Instructor Mai', specialty: 'Yoga & Recovery' },
-  ];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState('ALL');
+
+  const getPTSpecialty = (name: string) => {
+    if (name.includes('Trọng')) return 'STRENGTH CONDITIONING';
+    if (name.includes('An')) return 'HIIT CARDIO BLAST';
+    if (name.includes('Mai')) return 'YOGA RECOVERY';
+    return 'PERSONAL TRAINING';
+  };
+
+  const getPTRoom = (type: string) => {
+    if (type === 'STRENGTH CONDITIONING') return 'Khu Tạ A';
+    if (type === 'HIIT CARDIO BLAST') return 'Studio B';
+    if (type === 'YOGA RECOVERY') return 'Phòng Yoga';
+    return 'Khu CrossFit';
+  };
+
+  const filteredTrainers = trainers.filter(trainer => {
+    const matchesSearch = trainer.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = selectedSpecialty === 'ALL' || trainer.specialty === selectedSpecialty;
+    return matchesSearch && matchesFilter;
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedPT('');
+      setSelectedDate('');
+      setSelectedTime('');
+      setSearchQuery('');
+      setSelectedSpecialty('ALL');
+      return;
+    }
+
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/trainers', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch trainers');
+        return res.json();
+      })
+      .then((data: any[]) => {
+        const mapped = data.map(item => ({
+          id: String(item.id),
+          name: item.fullName,
+          specialty: getPTSpecialty(item.fullName),
+        }));
+        setTrainers(mapped);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Error fetching trainers:', err);
+        setLoading(false);
+      });
+  }, [isOpen]);
 
   const timeSlots = [
     { time: '06:00 - 07:00', available: true },
     { time: '07:00 - 08:00', available: true },
-    { time: '08:00 - 09:00', available: false },
+    { time: '08:00 - 09:00', available: true },
     { time: '09:00 - 10:00', available: true },
     { time: '17:00 - 18:00', available: true },
-    { time: '18:00 - 19:00', available: false },
+    { time: '18:00 - 19:00', available: true },
     { time: '19:00 - 20:00', available: true },
     { time: '20:00 - 21:00', available: true },
   ];
 
   const handleConfirm = () => {
-    if (selectedPT && selectedDate && selectedTime) {
-      console.log('Booking:', { selectedPT, selectedDate, selectedTime });
-      onClose();
+    if (!selectedPT || !selectedDate || !selectedTime) {
+      alert('Vui lòng chọn đầy đủ thông tin');
+      return;
     }
+
+    const currentUserStr = localStorage.getItem('currentUser');
+    if (!currentUserStr) {
+      alert('Không tìm thấy thông tin người dùng đăng nhập');
+      return;
+    }
+    const currentUser = JSON.parse(currentUserStr);
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const trainer = trainers.find(t => t.id === selectedPT);
+    const type = getPTSpecialty(trainer ? trainer.name : '');
+    const room = getPTRoom(type);
+
+    const body = {
+      userId: currentUser.id,
+      ptId: parseInt(selectedPT),
+      date: selectedDate,
+      timeSlot: selectedTime,
+      type: type,
+      room: room,
+    };
+
+    fetch('http://localhost:3001/bookings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Đăng ký lịch tập thất bại');
+        return res.json();
+      })
+      .then(() => {
+        alert('Đặt lịch tập thành công!');
+        window.dispatchEvent(new Event('booking-success'));
+        onClose();
+        setSelectedPT('');
+        setSelectedDate('');
+        setSelectedTime('');
+      })
+      .catch(err => {
+        console.error('Lỗi đặt lịch tập:', err);
+        alert('Có lỗi xảy ra khi đăng ký lịch tập. Hãy đảm bảo bạn đã nhập thông tin hợp lệ.');
+      });
   };
 
   if (!isOpen) return null;
@@ -64,22 +170,71 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <User className="w-5 h-5 text-[#FF5A00]" />
                 Chọn huấn luyện viên
               </label>
-              <div className="grid grid-cols-1 gap-3">
-                {trainers.map((trainer) => (
-                  <button
-                    key={trainer.id}
-                    onClick={() => setSelectedPT(trainer.id)}
-                    className={`p-4 border-2 text-left transition-all ${
-                      selectedPT === trainer.id
-                        ? 'border-[#FF5A00] bg-[#FF5A00]/10'
-                        : 'border-[#333333] hover:border-[#FF5A00]/50'
-                    }`}
-                  >
-                    <p className="font-bold text-white">{trainer.name}</p>
-                    <p className="text-sm text-[#A0A0A0]">{trainer.specialty}</p>
-                  </button>
-                ))}
-              </div>
+
+              {/* Search & Filter Controls */}
+              {!loading && trainers.length > 0 && (
+                <div className="mb-4 space-y-3">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm tên PT..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-[#1A1A1A] border-2 border-[#333333] focus:border-[#FF5A00] text-white transition-colors text-sm"
+                    />
+                    <Search className="w-4 h-4 text-[#A0A0A0] absolute left-3 top-3" />
+                  </div>
+
+                  {/* Specialty Filter Badges */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'ALL', label: 'Tất cả' },
+                      { id: 'STRENGTH CONDITIONING', label: 'Strength' },
+                      { id: 'HIIT CARDIO BLAST', label: 'HIIT & Cardio' },
+                      { id: 'YOGA RECOVERY', label: 'Yoga' },
+                      { id: 'PERSONAL TRAINING', label: 'PT chung' }
+                    ].map((spec) => (
+                      <button
+                        key={spec.id}
+                        onClick={() => setSelectedSpecialty(spec.id)}
+                        className={`px-3 py-1 text-xs font-bold uppercase transition-all ${
+                          selectedSpecialty === spec.id
+                            ? 'bg-[#FF5A00] text-white shadow-[0_0_8px_rgba(255,90,0,0.3)]'
+                            : 'bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00]/50 text-[#A0A0A0]'
+                        }`}
+                      >
+                        {spec.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {loading ? (
+                <div className="py-4 text-center text-[#A0A0A0] text-sm">Đang tải danh sách huấn luyện viên...</div>
+              ) : filteredTrainers.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                  {filteredTrainers.map((trainer) => (
+                    <button
+                      key={trainer.id}
+                      onClick={() => setSelectedPT(trainer.id)}
+                      className={`p-4 border-2 text-left transition-all ${
+                        selectedPT === trainer.id
+                          ? 'border-[#FF5A00] bg-[#FF5A00]/10'
+                          : 'border-[#333333] hover:border-[#FF5A00]/50'
+                      }`}
+                    >
+                      <p className="font-bold text-white">{trainer.name}</p>
+                      <p className="text-sm text-[#A0A0A0]">{trainer.specialty}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-4 text-center text-[#A0A0A0] text-sm">
+                  {trainers.length > 0 ? 'Không tìm thấy PT phù hợp kết quả lọc.' : 'Không tìm thấy huấn luyện viên nào.'}
+                </div>
+              )}
             </div>
 
             {/* Select Date */}

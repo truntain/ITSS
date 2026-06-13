@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
@@ -19,6 +19,20 @@ export class BookingsController {
   @ApiOperation({ summary: 'Hội viên đăng ký lịch hẹn tập mới (Member)' })
   create(@Body() createBookingDto: CreateBookingDto) {
     return this.bookingsService.create(createBookingDto);
+  }
+
+  @Get('my-bookings')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem danh sách lịch đặt tập của bản thân hội viên' })
+  findMyBookings(@Request() req: any) {
+    return this.bookingsService.findMyBookings(req.user.id);
+  }
+
+  @Patch('my-bookings/:id/cancel')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Hội viên tự hủy lịch đặt tập' })
+  cancelMyBooking(@Param('id') id: string, @Request() req: any) {
+    return this.bookingsService.cancelMyBooking(+id, req.user.id);
   }
 
   @Get()
