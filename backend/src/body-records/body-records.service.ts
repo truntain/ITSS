@@ -46,4 +46,11 @@ export class BodyRecordsService {
     await this.bodyRecordRepository.remove(bodyRecord);
     return { message: 'Xóa chỉ số cơ thể thành công' };
   }
+
+  async findMyRecords(userId: number) {
+    return this.bodyRecordRepository.find({
+      where: { userId },
+      order: { recordedDate: 'ASC' },
+    });
+  }
 }

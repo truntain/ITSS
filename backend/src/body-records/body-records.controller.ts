@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { BodyRecordsService } from './body-records.service';
 import { CreateBodyRecordDto } from './dto/create-body-record.dto';
 import { UpdateBodyRecordDto } from './dto/update-body-record.dto';
@@ -25,6 +25,13 @@ export class BodyRecordsController {
   @ApiOperation({ summary: 'Xem toàn bộ danh sách chỉ số cơ thể' })
   findAll() {
     return this.bodyRecordsService.findAll();
+  }
+
+  @Get('my-records')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem danh sách chỉ số cơ thể của bản thân hội viên' })
+  findMyRecords(@Request() req: any) {
+    return this.bodyRecordsService.findMyRecords(req.user.id);
   }
 
   @Get(':id')
