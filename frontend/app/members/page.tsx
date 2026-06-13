@@ -38,7 +38,7 @@ export default function MembersPage() {
         return <UserProfilePage />;
       default:
         return (
-          <div className="max-w-[1440px] mx-auto px-8 py-20">
+          <div className="max-w-[1800px] mx-auto px-8 py-20">
             <div className="bg-[#242424] border border-[#333333] rounded-lg p-12 shadow-xl text-center">
               <h2 className="text-3xl font-black text-white mb-3 uppercase">Tính năng đang được phát triển</h2>
               <p className="text-[#A0A0A0] text-lg">Chức năng này sẽ được cập nhật trong phiên bản tiếp theo</p>

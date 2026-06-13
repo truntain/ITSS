@@ -223,7 +223,7 @@ export function UserMembershipPage() {
 
   if (loading) {
     return (
-      <div className="max-w-[1440px] mx-auto px-8 py-16 flex flex-col items-center justify-center">
+      <div className="max-w-[1800px] mx-auto px-8 py-16 flex flex-col items-center justify-center">
         <div className="w-10 h-10 border-4 border-[#FF5A00]/20 border-t-[#FF5A00] rounded-full animate-spin mb-4"></div>
         <p className="text-[#A0A0A0]">Đang tải thông tin gói tập...</p>
       </div>
@@ -231,7 +231,7 @@ export function UserMembershipPage() {
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto px-8 py-12">
+    <div className="max-w-[1800px] mx-auto px-8 py-12">
       {/* Header */}
       <div className="mb-12">
         <h1 className="text-4xl font-black text-white mb-2 uppercase">GÓI TẬP &amp; DỊCH VỤ</h1>

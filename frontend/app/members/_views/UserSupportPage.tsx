@@ -220,7 +220,7 @@ export function UserSupportPage() {
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-8 py-8">
+    <div className="max-w-[1800px] mx-auto px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Submit Form */}
         <div className="bg-[#1A1A1A] border border-[#333333] rounded-2xl p-6">

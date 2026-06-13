@@ -159,7 +159,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
 
   if (loading || !currentUser) {
     return (
-      <div className="max-w-[1440px] mx-auto px-8 py-24 flex flex-col items-center justify-center min-h-[500px]">
+      <div className="max-w-[1800px] mx-auto px-8 py-24 flex flex-col items-center justify-center min-h-[500px]">
         <div className="w-10 h-10 border-4 border-[#FF5A00]/20 border-t-[#FF5A00] rounded-full animate-spin mb-4"></div>
         <p className="text-[#A0A0A0]">Đang tải dữ liệu tổng quan...</p>
       </div>
@@ -177,7 +177,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#121212]"></div>
-        <div className="relative z-10 max-w-[1440px] mx-auto px-8 h-full flex flex-col justify-center">
+        <div className="relative z-10 max-w-[1800px] mx-auto px-8 h-full flex flex-col justify-center">
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-2xl uppercase">
             XIN CHÀO, {currentUser.fullName || 'HỘI VIÊN'}!
           </h1>
@@ -186,7 +186,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
       </div>
 
       {/* Container for overlapping content */}
-      <div className="max-w-[1440px] mx-auto px-8">
+      <div className="max-w-[1800px] mx-auto px-8">
         {/* KPI Cards - Overlapping Hero */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 -mt-20 mb-12 relative z-20">
           {/* Membership Card */}

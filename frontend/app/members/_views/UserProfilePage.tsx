@@ -171,7 +171,7 @@ export function UserProfilePage() {
 
   if (loading) {
     return (
-      <div className="max-w-[1440px] mx-auto px-8 py-12 flex flex-col items-center justify-center min-h-[400px] text-[#A0A0A0]">
+      <div className="max-w-[1800px] mx-auto px-8 py-12 flex flex-col items-center justify-center min-h-[400px] text-[#A0A0A0]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF5A00] mb-4"></div>
         <p className="text-sm">Đang tải thông tin cá nhân...</p>
       </div>
@@ -179,7 +179,7 @@ export function UserProfilePage() {
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto px-8 py-12">
+    <div className="max-w-[1800px] mx-auto px-8 py-12">
       <div className="mb-8">
         <h1 className="text-4xl font-black text-white mb-2 uppercase">HỒ SƠ CÁ NHÂN</h1>
         <p className="text-[#A0A0A0]">Quản lý thông tin tài khoản của bạn</p>

@@ -49,7 +49,7 @@ export function UserEvaluationsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-[1440px] mx-auto px-8 py-24 flex flex-col items-center justify-center min-h-[500px]">
+      <div className="max-w-[1800px] mx-auto px-8 py-24 flex flex-col items-center justify-center min-h-[500px]">
         <Loader2 className="w-10 h-10 text-[#FF5A00] animate-spin mb-4" />
         <p className="text-[#A0A0A0]">Đang tải nhận xét từ Huấn luyện viên...</p>
       </div>
@@ -57,7 +57,7 @@ export function UserEvaluationsPage() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto px-8 py-12 space-y-8">
+    <div className="max-w-[1800px] mx-auto px-8 py-12 space-y-8">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#333333] pb-6">
         <div>

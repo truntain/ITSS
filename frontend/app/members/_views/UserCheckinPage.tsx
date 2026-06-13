@@ -66,7 +66,7 @@ export function UserCheckinPage() {
 
   if (!currentUser) {
     return (
-      <div className="max-w-[1440px] mx-auto px-8 py-16 flex items-center justify-center">
+      <div className="max-w-[1800px] mx-auto px-8 py-16 flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-[#FF5A00]/20 border-t-[#FF5A00] rounded-full animate-spin"></div>
       </div>
     );
@@ -102,7 +102,7 @@ export function UserCheckinPage() {
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-8 py-8">
+    <div className="max-w-[1800px] mx-auto px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Digital Card */}
         <div>

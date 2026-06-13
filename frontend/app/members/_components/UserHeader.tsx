@@ -43,7 +43,7 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-[#1A1A1A]/80 border-b border-[#333333] shadow-2xl">
-      <div className="max-w-[1440px] mx-auto px-8 h-20 flex items-center justify-between">
+      <div className="max-w-[1800px] mx-auto px-8 h-20 flex items-center justify-between">
         {/* Left: Logo */}
         <div className="flex items-center gap-3">
           <div className="text-4xl drop-shadow-[0_0_15px_rgba(255,90,0,0.6)]">🏋️</div>
