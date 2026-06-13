@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { Calendar, Users, FileText, TrendingUp, User } from 'lucide-react';
 
 interface PTSidebarProps {
@@ -8,6 +9,23 @@ interface PTSidebarProps {
 }
 
 export function PTSidebar({ activeMenu, onMenuClick }: PTSidebarProps) {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        setCurrentUser(JSON.parse(stored));
+      }
+    };
+
+    handleUserUpdate();
+    window.addEventListener('currentUserUpdated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('currentUserUpdated', handleUserUpdate);
+    };
+  }, []);
+
   const menuItems = [
     { id: 'schedule', label: 'Lịch làm việc', icon: Calendar },
     { id: 'clients', label: 'Danh sách Hội viên', icon: Users },
@@ -58,8 +76,8 @@ export function PTSidebar({ activeMenu, onMenuClick }: PTSidebarProps) {
             <User className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 text-sm">Lê Minh Trọng</p>
-            <p className="text-xs text-emerald-700 font-medium">Senior PT</p>
+            <p className="font-bold text-slate-900 text-sm">{currentUser?.fullName || 'Lê Minh Trọng'}</p>
+            <p className="text-xs text-emerald-700 font-medium">{currentUser?.role === 'PT' ? 'Huấn luyện viên' : currentUser?.role || 'Senior PT'}</p>
           </div>
         </div>
       </div>

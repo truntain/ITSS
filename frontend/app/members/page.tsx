@@ -10,6 +10,7 @@ import { UserCheckinPage } from './_views/UserCheckinPage';
 import { UserBodyTrackerPage } from './_views/UserBodyTrackerPage';
 import { UserSupportPage } from './_views/UserSupportPage';
 import { UserProfilePage } from './_views/UserProfilePage';
+import { UserEvaluationsPage } from './_views/UserEvaluationsPage';
 import { BookingModal } from './_components/BookingModal';
 import { AuthGuard } from '../../components/AuthGuard';
 
@@ -29,6 +30,8 @@ export default function MembersPage() {
         return <UserCheckinPage />;
       case 'tracker':
         return <UserBodyTrackerPage />;
+      case 'evaluations':
+        return <UserEvaluationsPage />;
       case 'support':
         return <UserSupportPage />;
       case 'profile':

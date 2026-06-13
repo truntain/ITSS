@@ -8,6 +8,7 @@ import { PTSchedulePage } from './_views/PTSchedulePage';
 import { PTTraineesPage } from './_views/PTTraineesPage';
 import { PTWorkoutsPage } from './_views/PTWorkoutsPage';
 import { PTEvaluationsPage } from './_views/PTEvaluationsPage';
+import { PTProfilePage } from './_views/PTProfilePage';
 import { AuthGuard } from '../../components/AuthGuard';
 
 export default function PTPage() {
@@ -24,6 +25,8 @@ export default function PTPage() {
         return 'Bài tập & Giáo án';
       case 'tracking':
         return 'Đánh giá & Chỉ số';
+      case 'profile':
+        return 'Hồ sơ cá nhân';
       default:
         return 'Lịch làm việc';
     }
@@ -39,6 +42,8 @@ export default function PTPage() {
         return <PTWorkoutsPage triggerCreatePlan={ptCreatePlanTrigger} />;
       case 'tracking':
         return <PTEvaluationsPage />;
+      case 'profile':
+        return <PTProfilePage />;
       default:
         return <PTSchedulePage />;
     }
@@ -53,10 +58,11 @@ export default function PTPage() {
         <div className="ml-64">
           <PTHeader
             pageTitle={getPTPageTitle()}
-            showCreatePlanButton={activeMenu === 'workouts'}
+            showCreatePlanButton={false}
             onCreatePlan={() => {
               setPtCreatePlanTrigger(Date.now());
             }}
+            onProfileClick={() => setActiveMenu('profile')}
             onLogout={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('currentUser');

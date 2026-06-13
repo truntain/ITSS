@@ -94,6 +94,14 @@ export class TrainersService {
     return { message: 'Xóa đánh giá tập luyện thành công' };
   }
 
+  async findEvaluationsByTrainee(traineeId: number) {
+    return this.evaluationRepository.find({
+      where: { traineeId },
+      relations: { pt: true },
+      order: { evaluationDate: 'DESC', createdAt: 'DESC' },
+    });
+  }
+
   // --- PtRating CRUD ---
   async createRating(dto: CreatePtRatingDto) {
     await this.findOneTrainer(dto.ptId);
@@ -186,5 +194,13 @@ export class TrainersService {
     const plan = await this.findOneWorkoutPlan(id);
     await this.workoutPlanRepository.remove(plan);
     return { message: 'Xóa giáo án bài tập thành công' };
+  }
+
+  async findWorkoutPlansByPt(ptId: number) {
+    return this.workoutPlanRepository.find({
+      where: { ptId },
+      relations: { trainee: true, pt: true },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

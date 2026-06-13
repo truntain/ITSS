@@ -127,4 +127,12 @@ export class MembershipsService {
       order: { endDate: 'DESC' },
     });
   }
+
+  async findAllByUserId(userId: number) {
+    return this.membershipRepository.find({
+      where: { userId },
+      relations: { package: true },
+      order: { endDate: 'DESC' },
+    });
+  }
 }

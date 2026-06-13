@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, Crown, Zap, Star, Calendar } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, Crown, Zap, Star, Calendar, ChevronDown } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
 import { PaymentModal } from '@/components/PaymentModal';
 import { PackageDetailModal } from '@/components/PackageDetailModal';
 
@@ -17,9 +17,33 @@ export function UserMembershipPage() {
     isRenewal: boolean;
   } | null>(null);
 
-  const [currentPackage, setCurrentPackage] = useState<any>(null);
+  // The "display" package: most expensive registered package (name + benefits)
+  // but daysLeft/expiryDate come from the active membership (cộng dồn)
+  const [currentPackage, setCurrentPackage] = useState<{
+    id: string;
+    name: string;
+    daysLeft: number;
+    expiryDate: string;
+    startDate: string;
+    benefits: string[];
+    price: string;
+    durationMonths: number;
+  } | null>(null);
+
+  // All unique packages the user has ever registered (for renewal dropdown)
+  const [myHistory, setMyHistory] = useState<Array<{
+    packageId: string;
+    packageName: string;
+    price: number;
+    durationMonths: number;
+  }>>([]);
+
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Renewal dropdown state
+  const [renewalOpen, setRenewalOpen] = useState(false);
+  const renewalRef = useRef<HTMLDivElement>(null);
 
   const formatBenefits = (benefits: any): string[] => {
     if (!benefits) return [];
@@ -59,44 +83,22 @@ export function UserMembershipPage() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // 1. Fetch active membership
+    // 1. Fetch active membership (for daysLeft / endDate countdown)
     const activePromise = fetch('http://localhost:3001/memberships/my-active', { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch active membership');
         return res.text();
       })
-      .then(text => {
-        return text ? JSON.parse(text) : null;
-      })
-      .then(data => {
-        if (data && data.package) {
-          const endDate = new Date(data.endDate);
-          const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+      .then(text => (text ? JSON.parse(text) : null));
 
-          const dStr = String(endDate.getDate()).padStart(2, '0');
-          const mStr = String(endDate.getMonth() + 1).padStart(2, '0');
-          const yStr = endDate.getFullYear();
-          const expiryDateFormatted = `${dStr}/${mStr}/${yStr}`;
-
-          setCurrentPackage({
-            id: data.package.id,
-            name: data.package.name,
-            daysLeft,
-            expiryDate: expiryDateFormatted,
-            startDate: data.startDate,
-            benefits: formatBenefits(data.package.benefits),
-            price: data.package.price,
-            durationMonths: data.package.durationMonths,
-          });
-        } else {
-          setCurrentPackage(null);
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching active membership:', err);
+    // 2. Fetch full membership history (to determine most expensive registered package)
+    const historyPromise = fetch('http://localhost:3001/memberships/my-history', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch membership history');
+        return res.json();
       });
 
-    // 2. Fetch packages list
+    // 3. Fetch all available packages for the "Mua gói mới" section
     const packagesPromise = fetch('http://localhost:3001/memberships/packages', { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch packages');
@@ -105,21 +107,85 @@ export function UserMembershipPage() {
       .then((data: any[]) => {
         const visiblePackages = data.filter(p => p.isVisible).map(p => ({
           ...p,
-          benefits: formatBenefits(p.benefits)
+          benefits: formatBenefits(p.benefits),
         }));
         setPackages(visiblePackages);
-      })
-      .catch(err => {
-        console.error('Error fetching packages:', err);
+        return visiblePackages;
       });
 
-    Promise.all([activePromise, packagesPromise]).finally(() => {
-      setLoading(false);
-    });
+    Promise.all([activePromise, historyPromise, packagesPromise])
+      .then(([activeData, historyData]) => {
+        // Build unique history list for renewal dropdown
+        const seenPkgIds = new Set<string>();
+        const historyList: typeof myHistory = [];
+        (historyData as any[]).forEach((m: any) => {
+          if (m.package && !seenPkgIds.has(m.package.id)) {
+            seenPkgIds.add(m.package.id);
+            historyList.push({
+              packageId: m.package.id,
+              packageName: m.package.name,
+              price: parseFloat(m.package.price),
+              durationMonths: m.package.durationMonths,
+            });
+          }
+        });
+        setMyHistory(historyList);
+
+        // Need an active membership to show the "Gói của tôi" card
+        if (activeData && activeData.package) {
+          const endDate = new Date(activeData.endDate);
+          const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          const dStr = String(endDate.getDate()).padStart(2, '0');
+          const mStr = String(endDate.getMonth() + 1).padStart(2, '0');
+          const yStr = endDate.getFullYear();
+          const expiryDateFormatted = `${dStr}/${mStr}/${yStr}`;
+
+          // Find the most expensive package among ALL registered ones
+          let priPkg = activeData.package;
+          let maxPrice = parseFloat(activeData.package.price);
+          (historyData as any[]).forEach((m: any) => {
+            if (m.package) {
+              const p = parseFloat(m.package.price);
+              if (p > maxPrice) {
+                maxPrice = p;
+                priPkg = m.package;
+              }
+            }
+          });
+
+          setCurrentPackage({
+            id: priPkg.id,
+            name: priPkg.name,
+            daysLeft,
+            expiryDate: expiryDateFormatted,
+            startDate: activeData.startDate,
+            benefits: formatBenefits(priPkg.benefits),
+            price: String(priPkg.price),
+            durationMonths: priPkg.durationMonths,
+          });
+        } else {
+          setCurrentPackage(null);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching membership data:', err);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  // Close renewal dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (renewalRef.current && !renewalRef.current.contains(e.target as Node)) {
+        setRenewalOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const getPackageIcon = (id: string) => {
@@ -130,16 +196,16 @@ export function UserMembershipPage() {
     return Zap;
   };
 
-  const handleRenewPackage = () => {
-    if (!currentPackage) return;
+  const handleSelectRenewalPackage = (histItem: typeof myHistory[0]) => {
     setSelectedPackage({
-      id: currentPackage.id,
-      name: currentPackage.name,
-      price: Number(currentPackage.price).toLocaleString('vi-VN'),
-      duration: `${currentPackage.durationMonths} tháng`,
-      durationMonths: currentPackage.durationMonths,
+      id: histItem.packageId,
+      name: histItem.packageName,
+      price: histItem.price.toLocaleString('vi-VN'),
+      duration: `${histItem.durationMonths} tháng`,
+      durationMonths: histItem.durationMonths,
       isRenewal: true,
     });
+    setRenewalOpen(false);
     setPaymentModalOpen(true);
   };
 
@@ -168,7 +234,7 @@ export function UserMembershipPage() {
     <div className="max-w-[1440px] mx-auto px-8 py-12">
       {/* Header */}
       <div className="mb-12">
-        <h1 className="text-4xl font-black text-white mb-2 uppercase">GÓI TẬP & DỊCH VỤ</h1>
+        <h1 className="text-4xl font-black text-white mb-2 uppercase">GÓI TẬP &amp; DỊCH VỤ</h1>
         <p className="text-[#A0A0A0]">Quản lý gói tập hiện tại và nâng cấp gói mới</p>
       </div>
 
@@ -216,13 +282,45 @@ export function UserMembershipPage() {
 
               {/* Right: Actions */}
               <div className="lg:w-64 flex flex-col justify-center gap-4">
-                <button
-                  onClick={handleRenewPackage}
-                  className="w-full px-6 py-4 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-5 h-5" />
-                  GIA HẠN GÓI
-                </button>
+                {/* Renewal dropdown */}
+                <div ref={renewalRef} className="relative">
+                  <button
+                    onClick={() => setRenewalOpen(prev => !prev)}
+                    className="w-full px-6 py-4 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      GIA HẠN GÓI
+                    </span>
+                    <ChevronDown className={`w-5 h-5 transition-transform ${renewalOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {renewalOpen && myHistory.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#1A1A1A] border border-[#FF5A00]/60 shadow-2xl z-50">
+                      <p className="px-4 py-2 text-[#A0A0A0] text-xs uppercase font-bold border-b border-[#333]">
+                        Chọn gói để gia hạn
+                      </p>
+                      {myHistory.map(item => (
+                        <button
+                          key={item.packageId}
+                          onClick={() => handleSelectRenewalPackage(item)}
+                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-[#FF5A00]/10 transition-colors text-left group"
+                        >
+                          <div>
+                            <p className="text-white font-bold text-sm group-hover:text-[#FF5A00] transition-colors">
+                              {item.packageName}
+                            </p>
+                            <p className="text-[#A0A0A0] text-xs">{item.durationMonths} tháng</p>
+                          </div>
+                          <p className="text-[#FF5A00] font-black text-sm">
+                            {item.price.toLocaleString('vi-VN')}đ
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={() => setDetailModalOpen(true)}
                   className="w-full px-6 py-3 bg-[#242424] border border-[#333333] hover:border-[#FF5A00] text-white font-bold uppercase transition-all"
@@ -260,7 +358,6 @@ export function UserMembershipPage() {
                     : 'border-[#333333] hover:border-[#FF5A00]'
                   }`}
               >
-                {/* Badge */}
                 {isVip && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-6 py-1 bg-[#FF5A00] text-white text-xs font-black uppercase shadow-lg whitespace-nowrap">
                     VIP PT 1 KÈM 1
@@ -274,7 +371,6 @@ export function UserMembershipPage() {
 
                 <div className="p-8 flex flex-col justify-between h-full">
                   <div>
-                    {/* Icon & Name */}
                     <div className="flex flex-col items-center mb-6">
                       <div
                         className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${isHighlighted
@@ -288,7 +384,6 @@ export function UserMembershipPage() {
                       <p className="text-[#A0A0A0] text-sm mt-1">{pkg.durationMonths} tháng</p>
                     </div>
 
-                    {/* Price */}
                     <div className="text-center mb-6 pb-6 border-b border-[#333333]">
                       <p className="text-4xl font-black text-[#FF5A00] mb-1">
                         {Number(pkg.price).toLocaleString('vi-VN')}
@@ -296,7 +391,6 @@ export function UserMembershipPage() {
                       <p className="text-[#A0A0A0] text-sm">VNĐ</p>
                     </div>
 
-                    {/* Benefits */}
                     <div className="space-y-3 mb-8">
                       {pkg.benefits && pkg.benefits.map((benefit: string, index: number) => (
                         <div key={index} className="flex items-start gap-3">
@@ -307,7 +401,6 @@ export function UserMembershipPage() {
                     </div>
                   </div>
 
-                  {/* CTA Button */}
                   <button
                     onClick={() => handlePurchasePackage(pkg)}
                     className={`w-full py-4 font-black uppercase transition-all mt-auto ${isHighlighted

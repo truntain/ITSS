@@ -40,6 +40,10 @@ export function UserSupportPage() {
   const [tickets, setTickets] = useState<FeedbackTicket[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // PT state
+  const [pts, setPts] = useState<any[]>([]);
+  const [selectedPtId, setSelectedPtId] = useState('');
+
   const fetchTickets = () => {
     setLoading(true);
     const token = localStorage.getItem('token');
@@ -81,11 +85,8 @@ export function UserSupportPage() {
           const dateFormatted = `${dStr}/${mStr}/${yStr}`;
 
           const typeLabels: Record<string, string> = {
-            service: 'Dịch vụ',
-            equipment: 'Thiết bị',
-            staff: 'Nhân viên',
-            package: 'Gói tập',
-            other: 'Khác',
+            service: 'Chất lượng dịch vụ',
+            trainer: 'Huấn luyện viên',
           };
           const resolvedType = typeLabels[type] || type;
 
@@ -110,12 +111,42 @@ export function UserSupportPage() {
 
   useEffect(() => {
     fetchTickets();
+
+    // Fetch member's bookings to get their personal trainers
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    fetch('http://localhost:3001/bookings/my-bookings', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch bookings');
+        return res.json();
+      })
+      .then((data: any[]) => {
+        const uniquePtsMap = new Map();
+        data.forEach(booking => {
+          if (booking.pt) {
+            uniquePtsMap.set(booking.pt.id, booking.pt);
+          }
+        });
+        setPts(Array.from(uniquePtsMap.values()));
+      })
+      .catch(err => {
+        console.error('Error fetching PT list:', err);
+      });
   }, []);
 
   const handleSubmitFeedback = (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackType || !feedbackTitle || !feedbackContent) {
       toast.error('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (feedbackType === 'trainer' && !selectedPtId) {
+      toast.error('Vui lòng chọn huấn luyện viên cần đánh giá');
       return;
     }
 
@@ -139,32 +170,51 @@ export function UserSupportPage() {
       title: feedbackTitle,
       content: feedbackContent,
       rating: rating,
+      ptId: selectedPtId ? parseInt(selectedPtId) : undefined,
     });
 
-    const body = {
-      userId: currentUser.id,
-      content: structuredContent,
-    };
-
-    fetch('http://localhost:3001/feedbacks', {
+    // 1. Submit feedback
+    const feedbackPromise = fetch('http://localhost:3001/feedbacks', {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to submit feedback');
-        return res.json();
-      })
+      body: JSON.stringify({
+        userId: currentUser.id,
+        content: structuredContent,
+      }),
+    }).then(res => {
+      if (!res.ok) throw new Error('Failed to submit feedback');
+      return res.json();
+    });
+
+    // 2. Submit rating for PT if feedback is about trainer
+    const ratingPromise = feedbackType === 'trainer'
+      ? fetch('http://localhost:3001/trainers/ratings', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            userId: currentUser.id,
+            ptId: parseInt(selectedPtId),
+            rating: rating || 5, // Default to 5 stars if not rated
+            comment: feedbackContent,
+          }),
+        }).then(res => {
+          if (!res.ok) throw new Error('Failed to submit PT rating');
+          return res.json();
+        })
+      : Promise.resolve();
+
+    Promise.all([feedbackPromise, ratingPromise])
       .then(() => {
-        toast.success('Phản hồi đã được gửi! Chúng tôi sẽ liên hệ trong 24 giờ.');
+        toast.success('Phản hồi và đánh giá đã được gửi thành công!');
         setFeedbackType('');
+        setSelectedPtId('');
         setFeedbackTitle('');
         setFeedbackContent('');
         setRating(0);
         fetchTickets();
       })
       .catch(err => {
-        console.error('Error submitting feedback:', err);
+        console.error('Error submitting feedback/rating:', err);
         toast.error('Có lỗi xảy ra khi gửi phản hồi');
       });
   };
@@ -183,19 +233,44 @@ export function UserSupportPage() {
               <div className="relative">
                 <select
                   value={feedbackType}
-                  onChange={(e) => setFeedbackType(e.target.value)}
+                  onChange={(e) => {
+                    setFeedbackType(e.target.value);
+                    if (e.target.value !== 'trainer') {
+                      setSelectedPtId('');
+                    }
+                  }}
                   className="w-full bg-[#242424] border border-[#333333] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5A00] appearance-none"
                 >
                   <option value="">-- Chọn loại phản hồi --</option>
                   <option value="service">Chất lượng dịch vụ</option>
-                  <option value="equipment">Thiết bị & Cơ sở vật chất</option>
-                  <option value="staff">Nhân viên / Huấn luyện viên</option>
-                  <option value="package">Gói tập & Thanh toán</option>
-                  <option value="other">Khác</option>
+                  <option value="trainer">Huấn luyện viên</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A0A0A0] pointer-events-none" />
               </div>
             </div>
+
+            {feedbackType === 'trainer' && (
+              <div>
+                <label className="text-[#A0A0A0] text-xs font-bold uppercase tracking-wide block mb-1.5">
+                  Huấn luyện viên cần đánh giá *
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedPtId}
+                    onChange={(e) => setSelectedPtId(e.target.value)}
+                    className="w-full bg-[#242424] border border-[#333333] text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5A00] appearance-none"
+                  >
+                    <option value="">-- Chọn huấn luyện viên --</option>
+                    {pts.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A0A0A0] pointer-events-none" />
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="text-[#A0A0A0] text-xs font-bold uppercase tracking-wide block mb-1.5">

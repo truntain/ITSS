@@ -65,6 +65,20 @@ export class MembershipsController {
     return this.membershipsService.findActiveByUserId(req.user.id);
   }
 
+  @Get('my-history')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem lịch sử các gói đã đăng ký của hội viên' })
+  async findMyHistory(@Request() req: any) {
+    return this.membershipsService.findAllByUserId(req.user.id);
+  }
+
+  @Get('active/:userId')
+  @Roles('AD', 'NV', 'PT')
+  @ApiOperation({ summary: 'Xem thông tin đăng ký hội viên đang hoạt động của hội viên cụ thể (Admin/Nhân viên/PT)' })
+  async findActiveByUserId(@Param('userId') userId: string) {
+    return this.membershipsService.findActiveByUserId(+userId);
+  }
+
   @Get()
   @Roles('AD', 'NV')
   @ApiOperation({ summary: 'Xem danh sách toàn bộ đăng ký hội viên (Admin/Nhân viên)' })

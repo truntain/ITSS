@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UpdateVoucherDto } from './dto/update-voucher.dto';
@@ -56,6 +56,13 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Xuất hóa đơn giao dịch mới (Admin/Nhân viên)' })
   create(@Body() dto: CreateTransactionDto) {
     return this.paymentsService.create(dto);
+  }
+
+  @Get('transactions/my-history')
+  @Roles('HV')
+  @ApiOperation({ summary: 'Xem lịch sử thanh toán của bản thân hội viên' })
+  findMyHistory(@Request() req: any) {
+    return this.paymentsService.findAllByUserId(req.user.id);
   }
 
   @Get('transactions')

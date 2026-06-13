@@ -45,6 +45,13 @@ export class TrainersController {
     return this.trainersService.findAllEvaluations();
   }
 
+  @Get('evaluations/trainee/:traineeId')
+  @Roles('AD', 'PT', 'HV')
+  @ApiOperation({ summary: 'Xem các đánh giá tập luyện của một học viên cụ thể' })
+  findEvaluationsByTrainee(@Param('traineeId') traineeId: string) {
+    return this.trainersService.findEvaluationsByTrainee(+traineeId);
+  }
+
   @Get('evaluations/:id')
   @ApiOperation({ summary: 'Xem thông tin chi tiết một đánh giá tập luyện' })
   findOneEvaluation(@Param('id') id: string) {
@@ -111,6 +118,13 @@ export class TrainersController {
   @ApiOperation({ summary: 'Xem danh sách tất cả giáo án bài tập' })
   findAllWorkoutPlans() {
     return this.trainersService.findAllWorkoutPlans();
+  }
+
+  @Get('workout-plans/trainer/:ptId')
+  @Roles('PT', 'AD')
+  @ApiOperation({ summary: 'Xem danh sách giáo án của huấn luyện viên cụ thể' })
+  findWorkoutPlansByPt(@Param('ptId') ptId: string) {
+    return this.trainersService.findWorkoutPlansByPt(+ptId);
   }
 
   @Get('workout-plans/:id')

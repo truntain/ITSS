@@ -1,4 +1,7 @@
+"use client";
+
 import { X, Crown, Calendar, DollarSign, Check, Clock, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface PackageDetailModalProps {
   isOpen: boolean;
@@ -14,61 +17,71 @@ interface PackageDetailModalProps {
   } | null;
 }
 
+interface PaymentRecord {
+  id: number;
+  transactionDate: string;
+  package?: { name: string };
+  finalAmount: number;
+  paymentMethod: string;
+}
+
 export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageDetailModalProps) {
+  const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
+  const [totalCheckIns, setTotalCheckIns] = useState(0);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+
+    setLoadingPayments(true);
+
+    // Fetch payment history
+    fetch('http://localhost:3001/payments/transactions/my-history', { headers })
+      .then(res => res.ok ? res.json() : [])
+      .then((data: PaymentRecord[]) => setPaymentHistory(Array.isArray(data) ? data : []))
+      .catch(() => setPaymentHistory([]))
+      .finally(() => setLoadingPayments(false));
+
+    // Fetch check-in stats
+    fetch('http://localhost:3001/checkins/my-history', { headers })
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => setTotalCheckIns(Array.isArray(data) ? data.length : 0))
+      .catch(() => setTotalCheckIns(0));
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const packageDetails = currentPackage ? {
     name: currentPackage.name,
     status: 'Đang hoạt động',
-    startDate: currentPackage.startDate || 'N/A',
+    startDate: currentPackage.startDate
+      ? (() => {
+          const d = new Date(currentPackage.startDate!);
+          return isNaN(d.getTime())
+            ? currentPackage.startDate
+            : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        })()
+      : 'N/A',
     expiryDate: currentPackage.expiryDate,
     daysLeft: currentPackage.daysLeft,
     totalDays: currentPackage.durationMonths * 30 || 30,
     price: Number(currentPackage.price).toLocaleString('vi-VN'),
     benefits: currentPackage.benefits,
-    usageStats: {
-      ptSessionsUsed: 0,
-      ptSessionsTotal: 0,
-      classesAttended: 0,
-      totalCheckIns: 0,
-    },
-  } : {
-    name: 'PREMIUM 12 THÁNG',
-    status: 'Đang hoạt động',
-    startDate: '20/05/2025',
-    expiryDate: '20/11/2026',
-    daysLeft: 185,
-    totalDays: 365,
-    price: '4,000,000',
-    benefits: [
-      'Truy cập không giới hạn tất cả thiết bị',
-      '20 buổi PT cá nhân/tháng',
-      'Tham gia tất cả lớp Group Class',
-      'Ưu tiên đặt lịch trước',
-      'Tủ khóa riêng biệt',
-      'Miễn phí đồ uống Protein',
-      'Giảm 20% dịch vụ Spa & Massage',
-    ],
-    usageStats: {
-      ptSessionsUsed: 85,
-      ptSessionsTotal: 240,
-      classesAttended: 42,
-      totalCheckIns: 127,
-    },
+  } : null;
+
+  if (!packageDetails) return null;
+
+  const daysUsed = packageDetails.totalDays - packageDetails.daysLeft;
+  const progressPercentage = Math.min(100, Math.max(0, (daysUsed / packageDetails.totalDays) * 100));
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   };
-
-  const paymentHistory = [
-    {
-      id: '1',
-      date: '20/05/2025',
-      description: 'Mua gói Premium 12 tháng',
-      amount: '4,000,000',
-      method: 'MoMo',
-      status: 'Thành công',
-    },
-  ];
-
-  const progressPercentage = ((packageDetails.totalDays - packageDetails.daysLeft) / packageDetails.totalDays) * 100;
 
   return (
     <>
@@ -139,7 +152,7 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
                 ></div>
               </div>
               <p className="text-[#A0A0A0] text-sm mt-2">
-                Đã sử dụng {packageDetails.totalDays - packageDetails.daysLeft} / {packageDetails.totalDays} ngày
+                Đã sử dụng {daysUsed} / {packageDetails.totalDays} ngày
               </p>
             </div>
 
@@ -149,29 +162,18 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
                 <TrendingUp className="w-6 h-6 text-[#FF5A00]" />
                 Thống kê sử dụng
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
-                  <p className="text-3xl font-black text-[#FF5A00] mb-1">
-                    {packageDetails.usageStats.ptSessionsUsed}/{packageDetails.usageStats.ptSessionsTotal}
-                  </p>
-                  <p className="text-[#A0A0A0] text-xs uppercase">Buổi PT</p>
+                  <p className="text-3xl font-black text-cyan-500 mb-1">{totalCheckIns}</p>
+                  <p className="text-[#A0A0A0] text-xs uppercase">Tổng Check-ins</p>
                 </div>
-
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
-                  <p className="text-3xl font-black text-emerald-500 mb-1">{packageDetails.usageStats.classesAttended}</p>
-                  <p className="text-[#A0A0A0] text-xs uppercase">Lớp học</p>
+                  <p className="text-3xl font-black text-[#FF5A00] mb-1">{packageDetails.daysLeft}</p>
+                  <p className="text-[#A0A0A0] text-xs uppercase">Ngày còn lại</p>
                 </div>
-
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
-                  <p className="text-3xl font-black text-cyan-500 mb-1">{packageDetails.usageStats.totalCheckIns}</p>
-                  <p className="text-[#A0A0A0] text-xs uppercase">Check-ins</p>
-                </div>
-
-                <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
-                  <p className="text-3xl font-black text-white mb-1">
-                    {((packageDetails.usageStats.ptSessionsUsed / packageDetails.usageStats.ptSessionsTotal) * 100).toFixed(0)}%
-                  </p>
-                  <p className="text-[#A0A0A0] text-xs uppercase">Tỷ lệ sử dụng</p>
+                  <p className="text-3xl font-black text-emerald-500 mb-1">{paymentHistory.length}</p>
+                  <p className="text-[#A0A0A0] text-xs uppercase">Lần thanh toán</p>
                 </div>
               </div>
             </div>
@@ -199,34 +201,49 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
                 Lịch sử thanh toán
               </h4>
               <div className="bg-[#1A1A1A] border border-[#333333] overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-[#242424]">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Ngày</th>
-                      <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Mô tả</th>
-                      <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Phương thức</th>
-                      <th className="px-4 py-3 text-right text-xs font-black text-white uppercase">Số tiền</th>
-                      <th className="px-4 py-3 text-center text-xs font-black text-white uppercase">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paymentHistory.map((payment) => (
-                      <tr key={payment.id} className="border-t border-[#333333]">
-                        <td className="px-4 py-4 text-white font-bold text-sm">{payment.date}</td>
-                        <td className="px-4 py-4 text-[#A0A0A0] text-sm">{payment.description}</td>
-                        <td className="px-4 py-4 text-white text-sm">{payment.method}</td>
-                        <td className="px-4 py-4 text-right text-[#FF5A00] font-black text-sm">
-                          {payment.amount} VNĐ
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-500 text-xs font-bold rounded">
-                            {payment.status}
-                          </span>
-                        </td>
+                {loadingPayments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-[#FF5A00]/20 border-t-[#FF5A00] rounded-full animate-spin"></div>
+                    <span className="text-[#A0A0A0] ml-3 text-sm">Đang tải...</span>
+                  </div>
+                ) : paymentHistory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-[#A0A0A0] text-sm">Chưa có lịch sử thanh toán</p>
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-[#242424]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Ngày</th>
+                        <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Gói tập</th>
+                        <th className="px-4 py-3 text-left text-xs font-black text-white uppercase">Phương thức</th>
+                        <th className="px-4 py-3 text-right text-xs font-black text-white uppercase">Số tiền</th>
+                        <th className="px-4 py-3 text-center text-xs font-black text-white uppercase">Trạng thái</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {paymentHistory.map((payment) => (
+                        <tr key={payment.id} className="border-t border-[#333333]">
+                          <td className="px-4 py-4 text-white font-bold text-sm">
+                            {formatDate(payment.transactionDate)}
+                          </td>
+                          <td className="px-4 py-4 text-[#A0A0A0] text-sm">
+                            {payment.package?.name || 'Gói tập'}
+                          </td>
+                          <td className="px-4 py-4 text-white text-sm">{payment.paymentMethod}</td>
+                          <td className="px-4 py-4 text-right text-[#FF5A00] font-black text-sm">
+                            {Number(payment.finalAmount).toLocaleString('vi-VN')} VNĐ
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-500 text-xs font-bold rounded">
+                              Thành công
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>

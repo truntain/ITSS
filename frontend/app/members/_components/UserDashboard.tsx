@@ -19,6 +19,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekDays, setWeekDays] = useState<any[]>([]);
+  const [selectedQrCode, setSelectedQrCode] = useState('');
 
   useEffect(() => {
     // Generate week days dynamically (Monday to Sunday)
@@ -345,6 +346,18 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedSession(session.type);
+                                // Generate QR code JSON structure representing the electronic card check-in
+                                if (currentUser) {
+                                  const code = JSON.stringify({
+                                    userId: currentUser.id,
+                                    fullName: currentUser.fullName,
+                                    role: currentUser.role,
+                                    type: 'checkin'
+                                  });
+                                  setSelectedQrCode(code);
+                                } else {
+                                  setSelectedQrCode('');
+                                }
                                 setShowCheckInModal(true);
                               }}
                               className="mt-4 self-end px-8 py-3 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase text-sm shadow-lg group-hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all"
@@ -476,6 +489,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
         isOpen={showCheckInModal}
         onClose={() => setShowCheckInModal(false)}
         sessionName={selectedSession}
+        qrCode={selectedQrCode}
       />
     </div>
   );

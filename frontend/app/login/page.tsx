@@ -39,8 +39,16 @@ export default function LoginPage() {
         });
 
         if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || 'Email hoặc mật khẩu không hợp lệ!');
+          let errMsg = 'Email hoặc mật khẩu không hợp lệ!';
+          try {
+            const errData = await response.json();
+            errMsg = errData.message || errMsg;
+          } catch (e) {
+            console.error('Failed to parse error response:', e);
+          }
+          setLoginError(errMsg);
+          toast.error(errMsg);
+          return;
         }
 
         const data = await response.json();

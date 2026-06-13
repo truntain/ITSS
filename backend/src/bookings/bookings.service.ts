@@ -49,6 +49,14 @@ export class BookingsService {
     });
   }
 
+  async findPtBookings(ptId: number) {
+    return this.bookingRepository.find({
+      where: { ptId },
+      relations: { user: true },
+      order: { date: 'DESC', timeSlot: 'ASC' },
+    });
+  }
+
   async cancelMyBooking(bookingId: number, userId: number) {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId, userId },

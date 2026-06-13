@@ -129,6 +129,14 @@ export class PaymentsService {
     });
   }
 
+  async findAllByUserId(userId: number) {
+    return this.transactionRepository.find({
+      where: { userId },
+      relations: { package: true, voucher: true },
+      order: { transactionDate: 'DESC' },
+    });
+  }
+
   async findOne(id: number) {
     const transaction = await this.transactionRepository.findOne({
       where: { id },

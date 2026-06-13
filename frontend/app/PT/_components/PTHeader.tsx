@@ -9,10 +9,12 @@ interface PTHeaderProps {
   onLogout?: () => void;
   showCreatePlanButton?: boolean;
   onCreatePlan?: () => void;
+  onProfileClick?: () => void;
 }
 
-export function PTHeader({ pageTitle = 'Lịch làm việc', onLogout, showCreatePlanButton = false, onCreatePlan }: PTHeaderProps) {
+export function PTHeader({ pageTitle = 'Lịch làm việc', onLogout, showCreatePlanButton = false, onCreatePlan, onProfileClick }: PTHeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -31,6 +33,22 @@ export function PTHeader({ pageTitle = 'Lịch làm việc', onLogout, showCreat
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu]);
+
+  // Sync current user with localStorage and listen for updates
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        setCurrentUser(JSON.parse(stored));
+      }
+    };
+
+    handleUserUpdate();
+    window.addEventListener('currentUserUpdated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('currentUserUpdated', handleUserUpdate);
+    };
+  }, []);
 
   const today = new Date(2026, 4, 17); // May 17, 2026
   const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -84,13 +102,19 @@ export function PTHeader({ pageTitle = 'Lịch làm việc', onLogout, showCreat
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
                 <div className="px-4 py-3 border-b border-slate-200">
-                  <p className="text-sm font-bold text-slate-900">Lê Minh Trọng</p>
-                  <p className="text-xs text-emerald-600">Senior PT</p>
+                  <p className="text-sm font-bold text-slate-900">{currentUser?.fullName || 'Lê Minh Trọng'}</p>
+                  <p className="text-xs text-emerald-600">{currentUser?.role === 'PT' ? 'Huấn luyện viên' : currentUser?.role || 'Senior PT'}</p>
                 </div>
 
-                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    if (onProfileClick) onProfileClick();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3 cursor-pointer"
+                >
                   <Settings className="w-4 h-4" />
-                  Cài đặt
+                  Hồ sơ cá nhân
                 </button>
 
                 {onLogout && (
@@ -99,7 +123,7 @@ export function PTHeader({ pageTitle = 'Lịch làm việc', onLogout, showCreat
                       setShowUserMenu(false);
                       onLogout();
                     }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3 cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
                     Đăng xuất

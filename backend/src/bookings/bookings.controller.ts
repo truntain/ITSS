@@ -28,6 +28,13 @@ export class BookingsController {
     return this.bookingsService.findMyBookings(req.user.id);
   }
 
+  @Get('pt-bookings')
+  @Roles('PT')
+  @ApiOperation({ summary: 'Xem danh sách lịch dạy của bản thân PT' })
+  findPtBookings(@Request() req: any) {
+    return this.bookingsService.findPtBookings(req.user.id);
+  }
+
   @Patch('my-bookings/:id/cancel')
   @Roles('HV')
   @ApiOperation({ summary: 'Hội viên tự hủy lịch đặt tập' })

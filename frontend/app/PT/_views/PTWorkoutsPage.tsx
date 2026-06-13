@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Search, Calendar, User, Clock, CheckCircle, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Search, Calendar, User, Clock, CheckCircle, RotateCcw, X, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Exercise {
@@ -26,7 +26,54 @@ interface WorkoutPlan {
   duration: string;
   status: 'active' | 'completed' | 'draft';
   createdDate: string;
-  exercises: Exercise[];
+  exercises: any;
+}
+
+function getWorkoutDetails(exercises: any) {
+  const isDayGrouped = Array.isArray(exercises) && exercises.length > 0 && 'day' in exercises[0];
+  
+  if (isDayGrouped) {
+    let totalWorkouts = 0;
+    const previewWorkouts: any[] = [];
+    
+    exercises.forEach((group: any) => {
+      if (Array.isArray(group.workouts)) {
+        totalWorkouts += group.workouts.length;
+        group.workouts.forEach((w: any) => {
+          previewWorkouts.push({
+            name: w.name,
+            sets: w.sets,
+            reps: w.reps,
+            rest: w.rest,
+            duration: w.duration,
+            speed: w.speed,
+            repeat: w.repeat,
+            day: group.day,
+          });
+        });
+      }
+    });
+    
+    return {
+      total: totalWorkouts,
+      preview: previewWorkouts,
+      isGrouped: true,
+    };
+  } else {
+    const list = Array.isArray(exercises) ? exercises : [];
+    return {
+      total: list.length,
+      preview: list.map((ex: any) => ({
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        weight: ex.weight,
+        notes: ex.notes,
+        day: '',
+      })),
+      isGrouped: false,
+    };
+  }
 }
 
 interface PTWorkoutsPageProps {
@@ -34,6 +81,8 @@ interface PTWorkoutsPageProps {
 }
 
 export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [planName, setPlanName] = useState('');
   const [selectedTrainee, setSelectedTrainee] = useState<number | null>(null);
@@ -42,55 +91,9 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
     { id: '1', name: '', sets: '', reps: '', weight: '', notes: '' },
   ]);
 
-  const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlan[]>([
-    {
-      id: '1',
-      name: 'Giáo án tăng cơ tuần 1',
-      traineeId: 1,
-      traineeName: 'Nguyễn Văn An',
-      duration: '4 tuần',
-      status: 'active',
-      createdDate: '2026-05-01',
-      exercises: [
-        { id: 'e1', name: 'Squat', sets: '4', reps: '10-12', weight: '60kg', notes: 'Giữ lưng thẳng' },
-        { id: 'e2', name: 'Bench Press', sets: '3', reps: '8-10', weight: '50kg', notes: 'Hạ từ từ' },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Cardio & Giảm cân cơ bản',
-      traineeId: 2,
-      traineeName: 'Trần Thị Bích',
-      duration: '6 tuần',
-      status: 'active',
-      createdDate: '2026-04-28',
-      exercises: [
-        { id: 'e3', name: 'Running', sets: '3', reps: '20 phút', weight: 'N/A', notes: 'Nhịp vừa phải' },
-        { id: 'e4', name: 'Burpees', sets: '3', reps: '15', weight: 'N/A', notes: 'Động tác chuẩn' },
-      ],
-    },
-    {
-      id: '3',
-      name: 'CrossFit nâng cao',
-      traineeId: 4,
-      traineeName: 'Hoàng Văn Đức',
-      duration: '8 tuần',
-      status: 'completed',
-      createdDate: '2026-03-15',
-      exercises: [
-        { id: 'e5', name: 'Deadlift', sets: '5', reps: '5', weight: '100kg', notes: 'Kéo từ sàn' },
-        { id: 'e6', name: 'Pull-up', sets: '4', reps: '8-10', weight: 'Bodyweight', notes: 'Full range' },
-      ],
-    },
-  ]);
-
-  const trainees: Trainee[] = [
-    { id: 1, name: 'Nguyễn Văn An' },
-    { id: 2, name: 'Trần Thị Bích' },
-    { id: 3, name: 'Lê Minh Hà' },
-    { id: 4, name: 'Hoàng Văn Đức' },
-    { id: 5, name: 'Phạm Thị Thu' },
-  ];
+  const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlan[]>([]);
+  const [trainees, setTrainees] = useState<Trainee[]>([]);
+  const [selectedPlanDetails, setSelectedPlanDetails] = useState<WorkoutPlan | null>(null);
 
   const exerciseOptions = [
     'Squat',
@@ -110,6 +113,92 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
     'Kettlebell Swing',
   ];
 
+  const fetchTrainees = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+      };
+
+      const res = await fetch('http://localhost:3001/bookings/pt-bookings', { headers });
+      if (!res.ok) throw new Error('Không thể tải danh sách đặt lịch');
+      const bookingsData = await res.json();
+
+      const uniqueTraineesMap = new Map<number, any>();
+      bookingsData.forEach((booking: any) => {
+        if (booking.user && booking.user.id) {
+          uniqueTraineesMap.set(booking.user.id, booking.user);
+        }
+      });
+
+      const uniqueList = Array.from(uniqueTraineesMap.values());
+      const mappedTrainees = uniqueList.map((user: any) => ({
+        id: user.id,
+        name: user.fullName,
+      }));
+      setTrainees(mappedTrainees);
+    } catch (err: any) {
+      console.error('Lỗi khi tải danh sách học viên:', err);
+    }
+  };
+
+  const fetchWorkoutPlans = async (ptId: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+      };
+
+      const res = await fetch(`http://localhost:3001/trainers/workout-plans/trainer/${ptId}`, { headers });
+      if (!res.ok) throw new Error('Không thể tải danh sách giáo án');
+      const data = await res.json();
+
+      const mappedPlans = data.map((dbPlan: any) => {
+        let exercisesData: any = [];
+        let status = 'active';
+
+        if (dbPlan.exercises) {
+          if (Array.isArray(dbPlan.exercises)) {
+            exercisesData = dbPlan.exercises;
+          } else if (typeof dbPlan.exercises === 'object') {
+            status = dbPlan.exercises.status || 'active';
+            exercisesData = dbPlan.exercises.list || [];
+          }
+        }
+
+        return {
+          id: String(dbPlan.id),
+          name: dbPlan.name,
+          traineeId: dbPlan.traineeId,
+          traineeName: dbPlan.trainee?.fullName || 'Học viên',
+          duration: dbPlan.description || '4 tuần',
+          status: status as 'active' | 'completed' | 'draft',
+          createdDate: dbPlan.assignedDate || dbPlan.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+          exercises: exercisesData,
+        };
+      });
+      setWorkoutPlans(mappedPlans);
+    } catch (err: any) {
+      console.error('Lỗi khi tải danh sách giáo án:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('currentUser');
+      if (stored) {
+        const user = JSON.parse(stored);
+        setCurrentUser(user);
+        if (user?.id) {
+          fetchTrainees();
+          fetchWorkoutPlans(user.id);
+        }
+      }
+    }
+  }, []);
+
   const handleAddExercise = () => {
     setExercises([
       ...exercises,
@@ -127,36 +216,54 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
     setExercises(exercises.map((ex) => (ex.id === id ? { ...ex, [field]: value } : ex)));
   };
 
-  const handleSavePlan = () => {
-    if (!planName || !selectedTrainee) {
+  const handleSavePlan = async () => {
+    if (!planName || !selectedTrainee || !currentUser) {
       toast.error('Vui lòng điền đầy đủ thông tin!');
       return;
     }
 
-    const trainee = trainees.find((t) => t.id === selectedTrainee);
-    if (!trainee) return;
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
 
-    const newPlan: WorkoutPlan = {
-      id: Date.now().toString(),
-      name: planName,
-      traineeId: selectedTrainee,
-      traineeName: trainee.name,
-      duration: '4 tuần',
-      status: 'active',
-      createdDate: new Date().toISOString().split('T')[0],
-      exercises: exercises.filter((ex) => ex.name), // Only include exercises with names
-    };
+      const payload = {
+        ptId: currentUser.id,
+        traineeId: selectedTrainee,
+        name: planName,
+        description: '4 tuần',
+        assignedDate: new Date().toISOString().split('T')[0],
+        exercises: {
+          status: 'active',
+          list: exercises.filter((ex) => ex.name),
+        },
+      };
 
-    // Add new plan to the top of the list
-    setWorkoutPlans([newPlan, ...workoutPlans]);
+      const res = await fetch('http://localhost:3001/trainers/workout-plans', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
 
-    // Reset form
-    setPlanName('');
-    setSelectedTrainee(null);
-    setExercises([{ id: '1', name: '', sets: '', reps: '', weight: '', notes: '' }]);
-    setShowPlanBuilder(false);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Lỗi khi lưu giáo án');
+      }
 
-    toast.success('Đã lưu giáo án thành công!');
+      toast.success('Đã lưu giáo án thành công!');
+      fetchWorkoutPlans(currentUser.id);
+
+      // Reset form
+      setPlanName('');
+      setSelectedTrainee(null);
+      setExercises([{ id: '1', name: '', sets: '', reps: '', weight: '', notes: '' }]);
+      setShowPlanBuilder(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Không thể lưu giáo án');
+    }
   };
 
   // Listen for trigger from header button
@@ -191,22 +298,46 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
         return status;
     }
   };
+  const handleToggleStatus = async (planId: string) => {
+    const plan = workoutPlans.find((p) => p.id === planId);
+    if (!plan || !currentUser) return;
+    const newStatus = plan.status === 'active' ? 'completed' : 'active';
 
-  const handleToggleStatus = (planId: string) => {
-    setWorkoutPlans(
-      workoutPlans.map((plan) => {
-        if (plan.id === planId) {
-          const newStatus = plan.status === 'active' ? 'completed' : 'active';
-          toast.success(
-            newStatus === 'completed'
-              ? 'Đã đánh dấu hoàn thành!'
-              : 'Đã khôi phục áp dụng!'
-          );
-          return { ...plan, status: newStatus };
-        }
-        return plan;
-      })
-    );
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      };
+
+      const payload = {
+        exercises: {
+          status: newStatus,
+          list: plan.exercises,
+        },
+      };
+
+      const res = await fetch(`http://localhost:3001/trainers/workout-plans/${planId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Lỗi khi cập nhật trạng thái');
+      }
+
+      toast.success(
+        newStatus === 'completed'
+          ? 'Đã đánh dấu hoàn thành!'
+          : 'Đã khôi phục áp dụng!'
+      );
+      fetchWorkoutPlans(currentUser.id);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Không thể cập nhật trạng thái giáo án');
+    }
   };
 
   const filteredPlans = filterTrainee
@@ -216,85 +347,125 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
   const activePlans = filteredPlans.filter((plan) => plan.status === 'active');
   const completedPlans = filteredPlans.filter((plan) => plan.status === 'completed');
 
-  const renderPlanCard = (plan: WorkoutPlan) => (
-    <div
-      key={plan.id}
-      className="bg-white rounded-xl border-2 border-slate-200 hover:border-emerald-300 shadow-sm p-5 transition-all"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <h4 className="text-lg font-bold text-slate-900 mb-2">{plan.name}</h4>
-          <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
-            <User className="w-4 h-4" />
-            <span>{plan.traineeName}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
-            <Clock className="w-4 h-4" />
-            <span>{plan.duration}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <Calendar className="w-4 h-4" />
-            <span>{new Date(plan.createdDate).toLocaleDateString('vi-VN')}</span>
-          </div>
-        </div>
-      </div>
+  const renderPlanCard = (plan: WorkoutPlan) => {
+    const details = getWorkoutDetails(plan.exercises);
+    const countLabel = details.isGrouped
+      ? `${details.total} bài tập (${plan.exercises.length} buổi)`
+      : `${details.total} bài tập`;
 
-      <div className="border-t border-slate-200 pt-3 mb-3">
-        <p className="text-sm font-semibold text-slate-700 mb-2">
-          Bài tập: {plan.exercises.length} bài
-        </p>
-        <div className="space-y-1">
-          {plan.exercises.slice(0, 2).map((ex) => (
-            <div key={ex.id} className="text-sm text-slate-600">
-              • {ex.name} - {ex.sets} sets × {ex.reps} reps
-            </div>
-          ))}
-          {plan.exercises.length > 2 && (
-            <div className="text-sm text-emerald-600 font-medium">
-              + {plan.exercises.length - 2} bài tập khác
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Status Toggle Button */}
-      <button
-        onClick={() => handleToggleStatus(plan.id)}
-        className={`w-full py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-          plan.status === 'active'
-            ? 'border-2 border-emerald-500 text-emerald-700 hover:bg-emerald-50'
-            : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-        }`}
+    return (
+      <div
+        key={plan.id}
+        className="bg-white rounded-xl border-2 border-slate-200 hover:border-emerald-300 shadow-sm p-5 transition-all"
       >
-        {plan.status === 'active' ? (
-          <>
-            <CheckCircle className="w-4 h-4" />
-            Đánh dấu hoàn thành
-          </>
-        ) : (
-          <>
-            <RotateCcw className="w-4 h-4" />
-            Khôi phục áp dụng
-          </>
-        )}
-      </button>
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <h4 className="text-lg font-bold text-slate-900 mb-2">{plan.name}</h4>
+            <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
+              <User className="w-4 h-4" />
+              <span>{plan.traineeName}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
+              <Clock className="w-4 h-4" />
+              <span>{plan.duration}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600">
+              <Calendar className="w-4 h-4" />
+              <span>{new Date(plan.createdDate).toLocaleDateString('vi-VN')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-200 pt-3 mb-3">
+          <p className="text-sm font-semibold text-slate-700 mb-2">
+            Bài tập: {countLabel}
+          </p>
+          <div className="space-y-1">
+            {details.preview.slice(0, 2).map((w, index) => {
+              const hasSetsReps = w.sets !== undefined || w.reps !== undefined;
+              const hasDuration = w.duration !== undefined;
+              
+              let desc = '';
+              if (hasSetsReps && (w.sets || w.reps)) {
+                desc = `${w.sets || 0} sets × ${w.reps || 0} reps`;
+              } else if (hasDuration && w.duration) {
+                desc = `${w.duration}${w.speed ? ` (Tốc độ ${w.speed})` : ''}`;
+              } else {
+                desc = 'Bài tập';
+              }
+
+              return (
+                <div key={index} className="text-sm text-slate-600 truncate">
+                  • {w.name} - {desc} {w.day ? `(${w.day.split(' ').slice(0, 2).join(' ')})` : ''}
+                </div>
+              );
+            })}
+            {details.total > 2 && (
+              <div className="text-sm text-emerald-600 font-medium">
+                + {details.total - 2} bài tập khác
+              </div>
+            )}
+          </div>
+        </div>
+
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setSelectedPlanDetails(plan)}
+          className="flex-1 py-2 rounded-lg font-medium border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+        >
+          <Eye className="w-4 h-4" />
+          Chi tiết
+        </button>
+
+        <button
+          onClick={() => handleToggleStatus(plan.id)}
+          className={`flex-1 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-sm cursor-pointer ${
+            plan.status === 'active'
+              ? 'border border-emerald-500 text-emerald-700 hover:bg-emerald-50'
+              : 'bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-500'
+          }`}
+        >
+          {plan.status === 'active' ? (
+            <>
+              <CheckCircle className="w-4 h-4" />
+              Hoàn thành
+            </>
+          ) : (
+            <>
+              <RotateCcw className="w-4 h-4" />
+              Khôi phục
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
+};
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-xl border border-slate-200 shadow-sm p-8">
+        <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mb-4 animate-none"></div>
+        <p className="text-slate-500 font-medium">Đang tải danh sách giáo án...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Top Action Bar */}
       {!showPlanBuilder && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex items-center gap-3">
               <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">
                 Chọn học viên:
               </label>
               <select
                 value={filterTrainee || ''}
                 onChange={(e) => setFilterTrainee(e.target.value ? Number(e.target.value) : null)}
-                className="flex-1 max-w-xs px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className="w-full max-w-xs px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               >
                 <option value="">Tất cả học viên</option>
                 {trainees.map((trainee) => (
@@ -304,11 +475,12 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
                 ))}
               </select>
             </div>
+
             <button
               onClick={() => setShowPlanBuilder(true)}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Tạo giáo án mới
             </button>
           </div>
@@ -523,6 +695,142 @@ export function PTWorkoutsPage({ triggerCreatePlan }: PTWorkoutsPageProps = {}) 
           </div>
         </div>
       )}
+      {/* Detail Plan Modal */}
+      {selectedPlanDetails && (() => {
+        const isGrouped = Array.isArray(selectedPlanDetails.exercises) && selectedPlanDetails.exercises.length > 0 && 'day' in selectedPlanDetails.exercises[0];
+        return (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-slate-200">
+              {/* Header */}
+              <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{selectedPlanDetails.name}</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Học viên: <span className="font-semibold text-slate-700">{selectedPlanDetails.traineeName}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedPlanDetails(null)}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5 text-slate-400 hover:text-slate-600" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto space-y-4 max-h-[60vh]">
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold uppercase">Mô tả/Thời lượng</p>
+                    <p className="text-sm font-bold text-slate-900 mt-1">{selectedPlanDetails.duration}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold uppercase">Ngày tạo</p>
+                    <p className="text-sm font-bold text-slate-900 mt-1">
+                      {new Date(selectedPlanDetails.createdDate).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-3">
+                    Danh sách bài tập {isGrouped ? `(${selectedPlanDetails.exercises.length} buổi)` : ''}
+                  </h4>
+                  {isGrouped ? (
+                    <div className="space-y-4">
+                      {selectedPlanDetails.exercises.map((group: any, gIndex: number) => (
+                        <div key={gIndex} className="space-y-2">
+                          <div className="text-sm font-bold text-slate-700 bg-slate-100 px-3 py-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                            <span>{group.day}</span>
+                            <span className="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                              {group.workouts?.length || 0} bài
+                            </span>
+                          </div>
+                          <div className="space-y-2 pl-2 border-l-2 border-emerald-500">
+                            {group.workouts?.map((w: any, wIndex: number) => {
+                              const hasSetsReps = w.sets !== undefined || w.reps !== undefined;
+                              const hasCardio = w.duration !== undefined || w.speed !== undefined || w.repeat !== undefined;
+                              return (
+                                <div key={wIndex} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-bold text-emerald-600">{w.name}</span>
+                                    {hasSetsReps && (w.sets || w.reps) && (
+                                      <span className="text-xs font-semibold text-slate-600 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
+                                        {w.sets} Sets × {w.reps} Reps
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                                    {hasSetsReps && w.rest && (
+                                      <div>
+                                        <span className="font-semibold text-slate-500">Thời gian nghỉ:</span> {w.rest}
+                                      </div>
+                                    )}
+                                    {hasCardio && (
+                                      <>
+                                        {w.duration && (
+                                          <div>
+                                            <span className="font-semibold text-slate-500">Thời gian:</span> {w.duration}
+                                          </div>
+                                        )}
+                                        {w.speed && (
+                                          <div>
+                                            <span className="font-semibold text-slate-500">Tốc độ:</span> {w.speed}
+                                          </div>
+                                        )}
+                                        {w.repeat && (
+                                          <div className="col-span-2">
+                                            <span className="font-semibold text-slate-500">Lặp lại:</span> {w.repeat}
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedPlanDetails.exercises.map((ex: any, index: number) => (
+                        <div key={ex.id || index} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-emerald-600">Bài {index + 1}: {ex.name}</span>
+                            <span className="text-xs font-semibold text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
+                              {ex.sets} Sets × {ex.reps} Reps
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                            <div>
+                              <span className="font-semibold text-slate-500">Trọng lượng:</span> {ex.weight || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-slate-500">Ghi chú:</span> {ex.notes || 'Không có'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3">
+                <button
+                  onClick={() => setSelectedPlanDetails(null)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-sm cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

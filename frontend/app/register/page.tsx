@@ -62,8 +62,16 @@ export default function RegisterPage() {
         });
 
         if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || 'Đăng ký thất bại. Vui lòng thử lại!');
+          let errMsg = 'Đăng ký thất bại. Vui lòng thử lại!';
+          try {
+            const errData = await response.json();
+            errMsg = errData.message || errMsg;
+          } catch (e) {
+            console.error('Failed to parse error response:', e);
+          }
+          setRegisterError(errMsg);
+          toast.error(errMsg);
+          return;
         }
 
         toast.success('Đăng ký tài khoản thành công!');

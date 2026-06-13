@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from 'react';
-import { Search, User, TrendingUp, Weight, Activity, Edit3, FileText, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, User, TrendingUp, Weight, Activity, Edit3 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
 
@@ -22,84 +22,241 @@ interface MetricData {
   muscle: number;
 }
 
-interface PTNote {
+
+
+interface BackendUser {
+  id: number;
+  fullName: string;
+  phone?: string;
+  email: string;
+  avatar?: string;
+  gender?: string;
+}
+
+interface BackendBooking {
   id: number;
   date: string;
-  note: string;
-  type: 'metric' | 'general';
+  timeSlot: string;
+  attendanceStatus?: string;
+  status: string;
+  user?: BackendUser;
 }
 
 export function PTTraineesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTrainee, setSelectedTrainee] = useState<Trainee | null>(null);
   const [showUpdateDrawer, setShowUpdateDrawer] = useState(false);
-  const [showNotesModal, setShowNotesModal] = useState(false);
   const [metricForm, setMetricForm] = useState({
     date: '',
     weight: '',
     fat: '',
     muscle: '',
-    notes: '',
   });
 
-  const [metricHistory, setMetricHistory] = useState<MetricData[]>([
-    { date: '01/04', weight: 78.5, fat: 22.3, muscle: 42.1 },
-    { date: '08/04', weight: 77.2, fat: 21.5, muscle: 42.8 },
-    { date: '15/04', weight: 76.8, fat: 20.8, muscle: 43.2 },
-    { date: '22/04', weight: 75.5, fat: 20.1, muscle: 43.9 },
-    { date: '29/04', weight: 74.9, fat: 19.6, muscle: 44.5 },
-    { date: '06/05', weight: 74.2, fat: 19.0, muscle: 45.1 },
-  ]);
+  const [metricHistory, setMetricHistory] = useState<MetricData[]>([]);
+  const [trainees, setTrainees] = useState<Trainee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<BackendUser | null>(null);
 
-  const [ptNotes, setPtNotes] = useState<PTNote[]>([
-    { id: 1, date: '2026-05-06', note: 'Tập luyện tốt, kỹ thuật squat được cải thiện rõ rệt', type: 'general' },
-    { id: 2, date: '2026-04-29', note: 'Cập nhật chỉ số: Giảm 0.6kg, tỷ lệ mỡ giảm 0.6%', type: 'metric' },
-    { id: 3, date: '2026-04-22', note: 'Học viên đang tiến bộ tốt, động lực cao', type: 'general' },
-    { id: 4, date: '2026-04-15', note: 'Đề xuất tăng khối lượng tập deadlift lên 60kg', type: 'general' },
-  ]);
+  const fetchTraineeDetails = useCallback(async (traineeId: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+      };
 
-  const trainees: Trainee[] = [
-    { id: 1, name: 'Nguyễn Văn An', avatar: '👨', package: '20 buổi PT', sessionsLeft: 12, phone: '0901234567', email: 'an.nguyen@email.com' },
-    { id: 2, name: 'Trần Thị Bích', avatar: '👩', package: '15 buổi PT', sessionsLeft: 8, phone: '0912345678', email: 'bich.tran@email.com' },
-    { id: 3, name: 'Lê Minh Hà', avatar: '👩', package: '10 buổi PT', sessionsLeft: 3, phone: '0923456789', email: 'ha.le@email.com' },
-    { id: 4, name: 'Hoàng Văn Đức', avatar: '👨', package: '20 buổi PT', sessionsLeft: 15, phone: '0934567890', email: 'duc.hoang@email.com' },
-    { id: 5, name: 'Phạm Thị Thu', avatar: '👩', package: '12 buổi PT', sessionsLeft: 6, phone: '0945678901', email: 'thu.pham@email.com' },
-    { id: 6, name: 'Trương Thế Thành', avatar: '👨', package: '15 buổi PT', sessionsLeft: 10, phone: '0956789012', email: 'thanh.truong@email.com' },
-    { id: 7, name: 'Phạm Quốc Tuấn', avatar: '👨', package: '20 buổi PT', sessionsLeft: 18, phone: '0967890123', email: 'tuan.pham@email.com' },
-  ];
+      // 1. Fetch body records
+      const recordsRes = await fetch(`http://localhost:3001/body-records/user/${traineeId}`, { headers });
+      if (!recordsRes.ok) throw new Error('Không thể tải chỉ số cơ thể');
+      const recordsData = await recordsRes.json();
+
+      // Map records to chart data format (recharts wants them sorted chronologically)
+      interface RecordType {
+        id: number;
+        recordedDate: string;
+        weight: string;
+        bodyFat: string;
+        muscleMass?: string;
+        notes?: string;
+      }
+      const mappedHistory: MetricData[] = recordsData.map((r: RecordType) => {
+        const dateObj = new Date(r.recordedDate);
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        return {
+          date: `${day}/${month}`,
+          weight: parseFloat(r.weight),
+          fat: parseFloat(r.bodyFat),
+          muscle: r.muscleMass ? parseFloat(r.muscleMass) : 0,
+        };
+      });
+      setMetricHistory(mappedHistory);
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Lỗi khi tải chi tiết chỉ số hội viên');
+    }
+  }, []);
+
+  const fetchTraineesData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('currentUser');
+      if (!token || !userStr) {
+        toast.error('Vui lòng đăng nhập lại');
+        setLoading(false);
+        return;
+      }
+
+      const parsedUser = JSON.parse(userStr) as BackendUser;
+      setCurrentUser(parsedUser);
+
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+      };
+
+      // Fetch bookings to get the trainees
+      const bookingsRes = await fetch('http://localhost:3001/bookings/pt-bookings', { headers });
+      if (!bookingsRes.ok) throw new Error('Không thể tải danh sách đặt lịch');
+      const bookingsData = await bookingsRes.json() as BackendBooking[];
+
+      // Extract unique trainees from bookings
+      const uniqueTraineesMap = new Map<number, BackendUser>();
+      bookingsData.forEach((booking) => {
+        if (booking.user && booking.user.id) {
+          uniqueTraineesMap.set(booking.user.id, booking.user);
+        }
+      });
+
+      const uniqueTraineesList = Array.from(uniqueTraineesMap.values());
+
+      // For each trainee, fetch their active membership to find package name and remaining sessions
+      interface MemDataType {
+        package?: {
+          name: string;
+        };
+        remainingSessions?: number;
+      }
+      const traineesListWithPackages = await Promise.all(
+        uniqueTraineesList.map(async (user) => {
+          try {
+            const memRes = await fetch(`http://localhost:3001/memberships/active/${user.id}`, { headers });
+            if (memRes.ok) {
+              const rawText = await memRes.text();
+              const memData = rawText ? JSON.parse(rawText) as MemDataType : null;
+              if (memData) {
+                return {
+                  id: user.id,
+                  name: user.fullName,
+                  avatar: user.avatar || (user.gender === 'female' ? '👩' : '👨'),
+                  package: memData.package?.name || 'Gói tập',
+                  sessionsLeft: memData.remainingSessions || 0,
+                  phone: user.phone || 'Chưa cập nhật',
+                  email: user.email,
+                };
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching membership for user ${user.id}:`, err);
+          }
+          return {
+            id: user.id,
+            name: user.fullName,
+            avatar: user.avatar || (user.gender === 'female' ? '👩' : '👨'),
+            package: 'Chưa đăng ký gói tập PT',
+            sessionsLeft: 0,
+            phone: user.phone || 'Chưa cập nhật',
+            email: user.email,
+          };
+        })
+      );
+
+      setTrainees(traineesListWithPackages);
+
+      // Select the first trainee if none selected
+      if (traineesListWithPackages.length > 0 && !selectedTrainee) {
+        setSelectedTrainee(traineesListWithPackages[0]);
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Lỗi khi tải thông tin hội viên');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedTrainee]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTraineesData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchTraineesData]);
+
+  useEffect(() => {
+    if (selectedTrainee) {
+      const timer = setTimeout(() => {
+        fetchTraineeDetails(selectedTrainee.id);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedTrainee, fetchTraineeDetails]);
 
   const filteredTrainees = trainees.filter((t) =>
     t.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleUpdateMetrics = () => {
+  const handleUpdateMetrics = async () => {
+    if (!selectedTrainee) return;
     if (metricForm.date && metricForm.weight && metricForm.fat && metricForm.muscle) {
-      // Add new metric data point
-      const newMetric: MetricData = {
-        date: new Date(metricForm.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }),
-        weight: parseFloat(metricForm.weight),
-        fat: parseFloat(metricForm.fat),
-        muscle: parseFloat(metricForm.muscle),
-      };
-      setMetricHistory([...metricHistory, newMetric]);
-
-      // Add PT note if provided
-      if (metricForm.notes) {
-        const newNote: PTNote = {
-          id: ptNotes.length + 1,
-          date: metricForm.date,
-          note: metricForm.notes,
-          type: 'metric',
+      try {
+        const token = localStorage.getItem('token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         };
-        setPtNotes([newNote, ...ptNotes]);
+
+        const payload = {
+          userId: selectedTrainee.id,
+          ptId: currentUser?.id || undefined,
+          weight: parseFloat(metricForm.weight),
+          bodyFat: parseFloat(metricForm.fat),
+          muscleMass: parseFloat(metricForm.muscle),
+          recordedDate: metricForm.date,
+        };
+
+        const res = await fetch('http://localhost:3001/body-records', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.message || 'Lỗi khi lưu chỉ số');
+        }
+
+        toast.success('Đã lưu cập nhật thành công!');
+        await fetchTraineeDetails(selectedTrainee.id);
+        setShowUpdateDrawer(false);
+        setMetricForm({ date: '', weight: '', fat: '', muscle: '' });
+      } catch (err: unknown) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : 'Không thể lưu chỉ số');
       }
-
-      toast.success('Đã lưu cập nhật thành công!');
+    } else {
+      toast.error('Vui lòng điền đầy đủ các chỉ số đo!');
     }
-
-    setShowUpdateDrawer(false);
-    setMetricForm({ date: '', weight: '', fat: '', muscle: '', notes: '' });
   };
+
+  if (loading) {
+    return (
+      <div className="h-[calc(100vh-120px)] flex items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 font-medium">Đang tải dữ liệu hội viên...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-6 h-[calc(100vh-120px)]">
@@ -121,28 +278,35 @@ export function PTTraineesPage() {
 
         {/* Trainee List */}
         <div className="flex-1 overflow-y-auto space-y-2">
-          {filteredTrainees.map((trainee) => (
-            <button
-              key={trainee.id}
-              onClick={() => setSelectedTrainee(trainee)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
-                selectedTrainee?.id === trainee.id
-                  ? 'border-emerald-500 bg-emerald-50'
-                  : 'border-slate-200 hover:border-emerald-300 bg-white'
-              }`}
-            >
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-2xl flex-shrink-0">
-                {trainee.avatar}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-900 truncate">{trainee.name}</p>
-                <p className="text-xs text-slate-500">{trainee.package}</p>
-              </div>
-              <div className="flex-shrink-0">
-                <span className="text-xs font-bold text-emerald-600">{trainee.sessionsLeft} buổi</span>
-              </div>
-            </button>
-          ))}
+          {filteredTrainees.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 text-sm">Chưa có hội viên nào đặt lịch</p>
+            </div>
+          ) : (
+            filteredTrainees.map((trainee) => (
+              <button
+                key={trainee.id}
+                onClick={() => setSelectedTrainee(trainee)}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                  selectedTrainee?.id === trainee.id
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-emerald-300 bg-white'
+                }`}
+              >
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-2xl flex-shrink-0">
+                  {trainee.avatar}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 truncate">{trainee.name}</p>
+                  <p className="text-xs text-slate-500">{trainee.package}</p>
+                </div>
+                <div className="flex-shrink-0">
+                  <span className="text-xs font-bold text-emerald-600">{trainee.sessionsLeft} buổi</span>
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </div>
 
@@ -167,13 +331,6 @@ export function PTTraineesPage() {
               </div>
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowNotesModal(true)}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <FileText className="w-4 h-4" />
-                  Xem ghi chú
-                </button>
                 <button
                   onClick={() => setShowUpdateDrawer(true)}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
@@ -305,17 +462,6 @@ export function PTTraineesPage() {
                 />
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Ghi chú của PT</label>
-                <textarea
-                  value={metricForm.notes}
-                  onChange={(e) => setMetricForm({ ...metricForm, notes: e.target.value })}
-                  placeholder="Ghi chú về tiến độ, thay đổi chế độ ăn uống, tập luyện..."
-                  rows={4}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-                />
-              </div>
             </div>
 
             {/* Actions */}
@@ -337,85 +483,6 @@ export function PTTraineesPage() {
         </div>
       )}
 
-      {/* View Notes Modal */}
-      {showNotesModal && selectedTrainee && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-900">Lịch sử ghi chú</h3>
-                <p className="text-slate-600 mt-1">{selectedTrainee.name}</p>
-              </div>
-              <button
-                onClick={() => setShowNotesModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-6 h-6 text-slate-600" />
-              </button>
-            </div>
-
-            {/* Timeline Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {ptNotes.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">Chưa có ghi chú nào</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {ptNotes.map((note, index) => (
-                    <div key={note.id} className="relative pl-8 pb-4">
-                      {/* Timeline line */}
-                      {index !== ptNotes.length - 1 && (
-                        <div className="absolute left-2 top-8 bottom-0 w-0.5 bg-slate-200"></div>
-                      )}
-
-                      {/* Timeline dot */}
-                      <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-full border-2 ${
-                        note.type === 'metric'
-                          ? 'bg-emerald-500 border-emerald-600'
-                          : 'bg-blue-500 border-blue-600'
-                      }`}></div>
-
-                      {/* Note card */}
-                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-bold text-slate-900">
-                            {new Date(note.date).toLocaleDateString('vi-VN', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </span>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            note.type === 'metric'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {note.type === 'metric' ? 'Chỉ số' : 'Ghi chú'}
-                          </span>
-                        </div>
-                        <p className="text-slate-700">{note.note}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-slate-200">
-              <button
-                onClick={() => setShowNotesModal(false)}
-                className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

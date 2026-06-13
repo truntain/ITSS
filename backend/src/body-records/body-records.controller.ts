@@ -34,6 +34,13 @@ export class BodyRecordsController {
     return this.bodyRecordsService.findMyRecords(req.user.id);
   }
 
+  @Get('user/:userId')
+  @Roles('AD', 'PT', 'HV')
+  @ApiOperation({ summary: 'Xem danh sách chỉ số cơ thể của một hội viên cụ thể' })
+  findUserRecords(@Param('userId') userId: string) {
+    return this.bodyRecordsService.findMyRecords(+userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Xem chi tiết chỉ số cơ thể' })
   findOne(@Param('id') id: string) {

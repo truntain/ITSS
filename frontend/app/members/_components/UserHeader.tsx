@@ -37,6 +37,7 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
     { id: 'membership', label: 'GÓI TẬP' },
     { id: 'checkin', label: 'THẺ ĐIỆN TỬ' },
     { id: 'tracker', label: 'CHỈ SỐ CƠ THỂ' },
+    { id: 'evaluations', label: 'ĐÁNH GIÁ CỦA PT' },
     { id: 'support', label: 'PHẢN HỒI' },
   ];
 
