@@ -14,6 +14,7 @@ interface PackageDetailModalProps {
     price: string;
     benefits: string[];
     durationMonths: number;
+    remainingSessions?: number;
   } | null;
 }
 
@@ -70,6 +71,7 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
     totalDays: currentPackage.durationMonths * 30 || 30,
     price: Number(currentPackage.price).toLocaleString('vi-VN'),
     benefits: currentPackage.benefits,
+    remainingSessions: currentPackage.remainingSessions || 0,
   } : null;
 
   if (!packageDetails) return null;
@@ -162,7 +164,7 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
                 <TrendingUp className="w-6 h-6 text-[#FF5A00]" />
                 Thống kê sử dụng
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
                   <p className="text-3xl font-black text-cyan-500 mb-1">{totalCheckIns}</p>
                   <p className="text-[#A0A0A0] text-xs uppercase">Tổng Check-ins</p>
@@ -170,6 +172,10 @@ export function PackageDetailModal({ isOpen, onClose, currentPackage }: PackageD
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
                   <p className="text-3xl font-black text-[#FF5A00] mb-1">{packageDetails.daysLeft}</p>
                   <p className="text-[#A0A0A0] text-xs uppercase">Ngày còn lại</p>
+                </div>
+                <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
+                  <p className="text-3xl font-black text-[#FF5A00] mb-1">{packageDetails.remainingSessions}</p>
+                  <p className="text-[#A0A0A0] text-xs uppercase">Số buổi PT còn lại</p>
                 </div>
                 <div className="bg-[#1A1A1A] border border-[#333333] p-4 text-center">
                   <p className="text-3xl font-black text-emerald-500 mb-1">{paymentHistory.length}</p>

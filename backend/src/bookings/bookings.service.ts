@@ -4,12 +4,14 @@ import { UpdateBookingDto } from './dto/update-booking.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Booking } from './entities/booking.entity';
+import { MembershipsService } from '../memberships/memberships.service';
 
 @Injectable()
 export class BookingsService {
   constructor(
     @InjectRepository(Booking)
     private readonly bookingRepository: Repository<Booking>,
+    private readonly membershipsService: MembershipsService,
   ) {}
 
   async create(createBookingDto: CreateBookingDto) {
@@ -36,7 +38,20 @@ export class BookingsService {
   }
 
   async update(id: number, updateBookingDto: UpdateBookingDto) {
-    await this.findOne(id); // Check existence
+    const booking = await this.findOne(id); // Check existence
+
+    // If the booking is being checked in, check if it had a PT and deduct a session
+    if (updateBookingDto.attendanceStatus === 'checked_in' && booking.attendanceStatus !== 'checked_in') {
+      if (booking.ptId && booking.ptId !== 11) { // 11 is the 'None/Self-training' placeholder
+        const activeMembership = await this.membershipsService.findActiveByUserId(booking.userId);
+        if (activeMembership && activeMembership.remainingSessions > 0) {
+          await this.membershipsService.update(activeMembership.id, {
+            remainingSessions: activeMembership.remainingSessions - 1,
+          });
+        }
+      }
+    }
+
     await this.bookingRepository.update(id, updateBookingDto);
     return this.findOne(id);
   }

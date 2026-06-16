@@ -9,6 +9,7 @@ import { PTTraineesPage } from './_views/PTTraineesPage';
 import { PTWorkoutsPage } from './_views/PTWorkoutsPage';
 import { PTEvaluationsPage } from './_views/PTEvaluationsPage';
 import { PTProfilePage } from './_views/PTProfilePage';
+import { PTFeedbackPage } from './_views/PTFeedbackPage';
 import { AuthGuard } from '../../components/AuthGuard';
 
 export default function PTPage() {
@@ -25,6 +26,8 @@ export default function PTPage() {
         return 'Bài tập & Giáo án';
       case 'tracking':
         return 'Đánh giá & Chỉ số';
+      case 'feedback':
+        return 'Đánh giá & Nhận xét';
       case 'profile':
         return 'Hồ sơ cá nhân';
       default:
@@ -42,6 +45,8 @@ export default function PTPage() {
         return <PTWorkoutsPage triggerCreatePlan={ptCreatePlanTrigger} />;
       case 'tracking':
         return <PTEvaluationsPage />;
+      case 'feedback':
+        return <PTFeedbackPage />;
       case 'profile':
         return <PTProfilePage />;
       default:

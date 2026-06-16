@@ -20,6 +20,147 @@ export function StaffSalesPage() {
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+
+  const fetchPendingTransactions = () => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch('http://localhost:3001/memberships', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const pending = data.filter((m: any) => m.status === 'paused');
+          setPendingTransactions(pending);
+        }
+      })
+      .catch(err => console.error('Error fetching pending memberships:', err));
+  };
+
+  const handleApproveTransaction = (tx: any) => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    // 1. Approve membership
+    fetch(`http://localhost:3001/memberships/${tx.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'active' })
+    })
+      .then(async res => {
+        if (!res.ok) throw new Error('Không thể duyệt gói tập');
+        return res.json();
+      })
+      .then(() => {
+        // 2. Create transaction record
+        let cashierId = undefined;
+        const userStr = localStorage.getItem('currentUser');
+        if (userStr) {
+          try {
+            cashierId = JSON.parse(userStr).id;
+          } catch (e) {}
+        }
+
+        const originalAmount = Number(tx.package?.price || 0);
+        const finalAmount = originalAmount;
+
+        const payload = {
+          receiptNo: `BILL-APPROVED-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          userId: tx.userId,
+          membershipId: tx.id,
+          packageId: tx.packageId,
+          originalAmount,
+          discountAmount: 0,
+          finalAmount,
+          paymentMethod: 'Chuyển khoản',
+          cashierId
+        };
+
+        return fetch('http://localhost:3001/payments/transactions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || 'Cập nhật trạng thái thành công nhưng không thể tạo lịch sử hóa đơn');
+        }
+
+        // 3. Create announcement notification
+        let cashierId = undefined;
+        const userStr = localStorage.getItem('currentUser');
+        if (userStr) {
+          try { cashierId = JSON.parse(userStr).id; } catch (e) {}
+        }
+
+        const announcePayload = {
+          title: `[Hệ thống] Duyệt thanh toán thành công`,
+          content: `Yêu cầu thanh toán chuyển khoản gói tập ${tx.package?.name || tx.packageId} của hội viên ${tx.user?.fullName || 'Hội viên'} đã được duyệt thành công! Gói tập đã được kích hoạt.`,
+          authorId: cashierId || 1
+        };
+
+        fetch('http://localhost:3001/announcements', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(announcePayload)
+        }).catch(err => console.error('Error posting approval announcement:', err));
+
+        toast.success('Đã xác nhận thanh toán thành công và kích hoạt gói tập!');
+        fetchPendingTransactions();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Lỗi khi duyệt giao dịch');
+      });
+  };
+
+  const handleRejectTransaction = (tx: any) => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    fetch(`http://localhost:3001/memberships/${tx.id}`, {
+      method: 'DELETE',
+      headers
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Từ chối giao dịch thất bại');
+
+        // Create announcement notification
+        let cashierId = undefined;
+        const userStr = localStorage.getItem('currentUser');
+        if (userStr) {
+          try { cashierId = JSON.parse(userStr).id; } catch (e) {}
+        }
+
+        const announcePayload = {
+          title: `[Hệ thống] Từ chối thanh toán`,
+          content: `Yêu cầu thanh toán chuyển khoản gói tập ${tx.package?.name || tx.packageId} của hội viên ${tx.user?.fullName || 'Hội viên'} đã bị từ chối do giao dịch thất bại. Vui lòng kiểm tra lại thông tin chuyển khoản hoặc liên hệ quầy lễ tân.`,
+          authorId: cashierId || 1
+        };
+
+        fetch('http://localhost:3001/announcements', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(announcePayload)
+        }).catch(err => console.error('Error posting rejection announcement:', err));
+
+        toast.success('Đã hủy giao dịch thanh toán chuyển khoản thất bại!');
+        fetchPendingTransactions();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Lỗi khi từ chối giao dịch');
+      });
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -52,6 +193,8 @@ export function StaffSalesPage() {
         console.error('Error loading sales page data:', err);
         setLoading(false);
       });
+
+    fetchPendingTransactions();
   }, []);
 
   const filteredMembers = members.filter(m =>
@@ -147,6 +290,57 @@ export function StaffSalesPage() {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       {/* Left Side - 60% (3 columns) */}
       <div className="lg:col-span-3 space-y-6">
+        {/* Pending Transactions Section */}
+        <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
+          <h3 className="text-lg font-bold text-[var(--foreground)] mb-4 flex items-center gap-2">
+            <QrCode className="w-5 h-5 text-orange-500 animate-pulse" />
+            Yêu cầu thanh toán chuyển khoản chờ duyệt ({pendingTransactions.length})
+          </h3>
+
+          {pendingTransactions.length === 0 ? (
+            <div className="text-center py-6 text-[var(--muted-foreground)] border border-dashed border-[var(--border)] rounded-lg">
+              <p className="text-sm">Không có yêu cầu chuyển khoản nào đang chờ duyệt.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingTransactions.map((tx) => (
+                <div key={tx.id} className="p-4 bg-[var(--background)] border border-[var(--border)] rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-[var(--foreground)] text-sm">{tx.user?.fullName || 'Hội viên ẩn danh'}</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">(HV{String(tx.userId).padStart(3, '0')})</span>
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      Đăng ký gói: <span className="font-semibold text-[var(--foreground)]">{tx.package?.name || tx.packageId}</span>
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      Số tiền: <span className="font-semibold text-orange-500">{Number(tx.package?.price || 0).toLocaleString('vi-VN')}đ</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--muted-foreground)]">
+                      Yêu cầu lúc: {new Date(tx.createdAt).toLocaleString('vi-VN')}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button
+                      onClick={() => handleApproveTransaction(tx)}
+                      className="flex-1 md:flex-none px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Duyệt
+                    </button>
+                    <button
+                      onClick={() => handleRejectTransaction(tx)}
+                      className="flex-1 md:flex-none px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" /> Từ chối
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Customer Search */}
         <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
           <h3 className="text-lg font-bold text-[var(--foreground)] mb-4">Chọn khách hàng</h3>

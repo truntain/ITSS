@@ -73,10 +73,27 @@ export class MembershipsService {
       throw new BadRequestException(`Gói tập #${createMembershipDto.packageId} đã ngừng cung cấp và không thể đăng ký mới!`);
     }
 
+    if (createMembershipDto.totalSessions === undefined || createMembershipDto.totalSessions === null) {
+      let totalSessions = 0;
+      if (pkg.id === 'VIP_PT_3M' || pkg.name.includes('VIP Kèm PT 3 Tháng')) {
+        totalSessions = 36;
+      } else if (pkg.benefits && typeof pkg.benefits === 'object' && typeof pkg.benefits.sessions === 'number') {
+        totalSessions = pkg.benefits.sessions;
+      } else if (pkg.id.toLowerCase().includes('pt') || pkg.name.toLowerCase().includes('pt')) {
+        totalSessions = 20;
+      }
+      createMembershipDto.totalSessions = totalSessions;
+      createMembershipDto.remainingSessions = totalSessions;
+    }
+
     // Check if there is an active membership for this user
     const activeMembership = await this.findActiveByUserId(createMembershipDto.userId);
     let extraDays = 0;
-    if (activeMembership) {
+    
+    // Only expire active memberships if the new membership is active immediately
+    const isNewActive = createMembershipDto.status === 'active' || !createMembershipDto.status;
+    
+    if (activeMembership && isNewActive) {
       const remainingTime = new Date(activeMembership.endDate).getTime() - Date.now();
       if (remainingTime > 0) {
         extraDays = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
@@ -88,7 +105,7 @@ export class MembershipsService {
     }
 
     // Calculate start date and end date
-    if (extraDays > 0) {
+    if (extraDays > 0 && isNewActive) {
       const endDate = new Date(createMembershipDto.endDate);
       endDate.setDate(endDate.getDate() + extraDays);
 
@@ -121,10 +138,37 @@ export class MembershipsService {
   }
 
   async update(id: number, updateMembershipDto: UpdateMembershipDto) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
     if (updateMembershipDto.packageId) {
       await this.findOnePackage(updateMembershipDto.packageId);
     }
+
+    // Check if we are activating a pending membership
+    if (existing.status === 'paused' && updateMembershipDto.status === 'active') {
+      // 1. Deactivate old active membership and calculate carryover days
+      const activeMembership = await this.findActiveByUserId(existing.userId);
+      let extraDays = 0;
+      if (activeMembership && activeMembership.id !== existing.id) {
+        const remainingTime = new Date(activeMembership.endDate).getTime() - Date.now();
+        if (remainingTime > 0) {
+          extraDays = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
+        }
+        activeMembership.status = 'expired';
+        await this.membershipRepository.save(activeMembership);
+      }
+
+      // 2. Adjust end date of the approved membership if there are carryover days
+      if (extraDays > 0) {
+        const currentEndDate = new Date(existing.endDate);
+        currentEndDate.setDate(currentEndDate.getDate() + extraDays);
+        
+        const y = currentEndDate.getFullYear();
+        const m = String(currentEndDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentEndDate.getDate()).padStart(2, '0');
+        updateMembershipDto.endDate = `${y}-${m}-${d}`;
+      }
+    }
+
     await this.membershipRepository.update(id, updateMembershipDto);
     return this.findOne(id);
   }

@@ -61,11 +61,13 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return res.json();
       })
       .then((data: any[]) => {
-        const mapped = data.map(item => ({
-          id: String(item.id),
-          name: item.fullName,
-          specialty: getPTSpecialty(item.fullName),
-        }));
+        const mapped = data
+          .filter(item => item.status === 'working')
+          .map(item => ({
+            id: String(item.id),
+            name: item.fullName,
+            specialty: getPTSpecialty(item.fullName),
+          }));
         setTrainers(mapped);
         setLoading(false);
       })
@@ -75,20 +77,45 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
       });
   }, [isOpen]);
 
+  const isSlotPast = (slotTime: string, dateStr: string) => {
+    if (!dateStr) return false;
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+
+    if (dateStr !== todayStr) return false;
+
+    const [startPart] = slotTime.split('-');
+    const [sh, sm] = startPart.trim().split(':').map(Number);
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    return sh < currentHour || (sh === currentHour && sm <= currentMinute);
+  };
+
   const timeSlots = [
-    { time: '06:00 - 07:00', available: true },
-    { time: '07:00 - 08:00', available: true },
-    { time: '08:00 - 09:00', available: true },
-    { time: '09:00 - 10:00', available: true },
-    { time: '17:00 - 18:00', available: true },
-    { time: '18:00 - 19:00', available: true },
-    { time: '19:00 - 20:00', available: true },
-    { time: '20:00 - 21:00', available: true },
+    { time: '06:00 - 07:00', available: !isSlotPast('06:00 - 07:00', selectedDate) },
+    { time: '07:00 - 08:00', available: !isSlotPast('07:00 - 08:00', selectedDate) },
+    { time: '08:00 - 09:00', available: !isSlotPast('08:00 - 09:00', selectedDate) },
+    { time: '09:00 - 10:00', available: !isSlotPast('09:00 - 10:00', selectedDate) },
+    { time: '17:00 - 18:00', available: !isSlotPast('17:00 - 18:00', selectedDate) },
+    { time: '18:00 - 19:00', available: !isSlotPast('18:00 - 19:00', selectedDate) },
+    { time: '19:00 - 20:00', available: !isSlotPast('19:00 - 20:00', selectedDate) },
+    { time: '20:00 - 21:00', available: !isSlotPast('20:00 - 21:00', selectedDate) },
   ];
 
   const handleConfirm = () => {
     if (!selectedPT || !selectedDate || !selectedTime) {
       alert('Vui lòng chọn đầy đủ thông tin');
+      return;
+    }
+
+    if (isSlotPast(selectedTime, selectedDate)) {
+      alert('Không thể đặt lịch ở khung giờ đã qua trong ngày hôm nay!');
       return;
     }
 
@@ -171,69 +198,120 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 Chọn huấn luyện viên
               </label>
 
-              {/* Search & Filter Controls */}
-              {!loading && trainers.length > 0 && (
-                <div className="mb-4 space-y-3">
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Tìm kiếm tên PT..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 bg-[#1A1A1A] border-2 border-[#333333] focus:border-[#FF5A00] text-white transition-colors text-sm"
-                    />
-                    <Search className="w-4 h-4 text-[#A0A0A0] absolute left-3 top-3" />
-                  </div>
+              {/* Mode Toggle: Kèm PT vs Không kèm PT */}
+              <div className="flex gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPT('11')}
+                  className={`flex-1 py-3 px-4 font-bold text-sm transition-all border-2 text-center flex items-center justify-center gap-2 ${
+                    selectedPT === '11'
+                      ? 'bg-[#FF5A00]/10 border-[#FF5A00] text-white shadow-[0_0_15px_rgba(255,90,0,0.2)]'
+                      : 'bg-[#1A1A1A] border-[#333333] text-[#A0A0A0] hover:border-[#FF5A00]/50 hover:text-white'
+                  }`}
+                >
+                  Không kèm PT (Tự tập)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedPT === '11') {
+                      setSelectedPT('');
+                    }
+                  }}
+                  className={`flex-1 py-3 px-4 font-bold text-sm transition-all border-2 text-center flex items-center justify-center gap-2 ${
+                    selectedPT !== '11'
+                      ? 'bg-[#FF5A00]/10 border-[#FF5A00] text-white shadow-[0_0_15px_rgba(255,90,0,0.2)]'
+                      : 'bg-[#1A1A1A] border-[#333333] text-[#A0A0A0] hover:border-[#FF5A00]/50 hover:text-white'
+                  }`}
+                >
+                  Kèm PT (Chọn HLV)
+                </button>
+              </div>
 
-                  {/* Specialty Filter Badges */}
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: 'ALL', label: 'Tất cả' },
-                      { id: 'STRENGTH CONDITIONING', label: 'Strength' },
-                      { id: 'HIIT CARDIO BLAST', label: 'HIIT & Cardio' },
-                      { id: 'YOGA RECOVERY', label: 'Yoga' },
-                      { id: 'PERSONAL TRAINING', label: 'PT chung' }
-                    ].map((spec) => (
-                      <button
-                        key={spec.id}
-                        onClick={() => setSelectedSpecialty(spec.id)}
-                        className={`px-3 py-1 text-xs font-bold uppercase transition-all ${
-                          selectedSpecialty === spec.id
-                            ? 'bg-[#FF5A00] text-white shadow-[0_0_8px_rgba(255,90,0,0.3)]'
-                            : 'bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00]/50 text-[#A0A0A0]'
-                        }`}
-                      >
-                        {spec.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {loading ? (
-                <div className="py-4 text-center text-[#A0A0A0] text-sm">Đang tải danh sách huấn luyện viên...</div>
-              ) : filteredTrainers.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
-                  {filteredTrainers.map((trainer) => (
-                    <button
-                      key={trainer.id}
-                      onClick={() => setSelectedPT(trainer.id)}
-                      className={`p-4 border-2 text-left transition-all ${
-                        selectedPT === trainer.id
-                          ? 'border-[#FF5A00] bg-[#FF5A00]/10'
-                          : 'border-[#333333] hover:border-[#FF5A00]/50'
-                      }`}
-                    >
-                      <p className="font-bold text-white">{trainer.name}</p>
-                      <p className="text-sm text-[#A0A0A0]">{trainer.specialty}</p>
-                    </button>
-                  ))}
+              {selectedPT === '11' ? (
+                <div className="p-4 bg-[#1A1A1A] border-2 border-dashed border-[#333333] rounded-lg text-center text-[#A0A0A0] text-sm">
+                  Bạn đã chọn tự tập luyện tại phòng tập và không có huấn luyện viên đi kèm.
                 </div>
               ) : (
-                <div className="py-4 text-center text-[#A0A0A0] text-sm">
-                  {trainers.length > 0 ? 'Không tìm thấy PT phù hợp kết quả lọc.' : 'Không tìm thấy huấn luyện viên nào.'}
-                </div>
+                <>
+                  {/* Search & Filter Controls */}
+                  {!loading && trainers.length > 0 && (
+                    <div className="mb-4 space-y-3">
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Tìm kiếm tên PT..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 bg-[#1A1A1A] border-2 border-[#333333] focus:border-[#FF5A00] text-white transition-colors text-sm"
+                        />
+                        <Search className="w-4 h-4 text-[#A0A0A0] absolute left-3 top-3" />
+                      </div>
+
+                      {/* Specialty Filter Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: 'ALL', label: 'Tất cả' },
+                          { id: 'STRENGTH CONDITIONING', label: 'Strength' },
+                          { id: 'HIIT CARDIO BLAST', label: 'HIIT & Cardio' },
+                          { id: 'YOGA RECOVERY', label: 'Yoga' },
+                          { id: 'PERSONAL TRAINING', label: 'PT chung' }
+                        ].map((spec) => (
+                          <button
+                            key={spec.id}
+                            type="button"
+                            onClick={() => setSelectedSpecialty(spec.id)}
+                            className={`px-3 py-1 text-xs font-bold uppercase transition-all ${
+                              selectedSpecialty === spec.id
+                                ? 'bg-[#FF5A00] text-white shadow-[0_0_8px_rgba(255,90,0,0.3)]'
+                                : 'bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00]/50 text-[#A0A0A0]'
+                            }`}
+                          >
+                            {spec.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {loading ? (
+                    <div className="py-4 text-center text-[#A0A0A0] text-sm">Đang tải danh sách huấn luyện viên...</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredTrainers.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
+                          {filteredTrainers.map((trainer) => (
+                            <button
+                              key={trainer.id}
+                              type="button"
+                              onClick={() => setSelectedPT(trainer.id)}
+                              className={`p-4 border-2 text-left transition-all flex justify-between items-center ${
+                                selectedPT === trainer.id
+                                  ? 'border-[#FF5A00] bg-[#FF5A00]/10'
+                                  : 'border-[#333333] hover:border-[#FF5A00]/50'
+                              }`}
+                            >
+                              <div>
+                                  <p className="font-bold text-white">{trainer.name}</p>
+                                  <p className="text-sm text-[#A0A0A0]">{trainer.specialty}</p>
+                               </div>
+                               {selectedPT === trainer.id && (
+                                 <div className="w-6 h-6 rounded-full bg-[#FF5A00] flex items-center justify-center flex-shrink-0">
+                                   <Check className="w-4 h-4 text-white" />
+                                 </div>
+                               )}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-[#A0A0A0] text-sm">
+                          {trainers.length > 0 ? 'Không tìm thấy PT phù hợp kết quả lọc.' : 'Không tìm thấy huấn luyện viên nào.'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

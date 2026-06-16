@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { QrCode, CheckCircle, XCircle, AlertTriangle, X, Send } from 'lucide-react';
+import { QrCode, CheckCircle, XCircle, AlertTriangle, X, Send, Clock, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
 type CheckinStatus = 'valid' | 'expired';
@@ -45,6 +45,26 @@ export function StaffCheckinPage() {
 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
+
+  // New state variables for booking check-in filtering
+  const [selectedBookingMemberId, setSelectedBookingMemberId] = useState<number | null>(null);
+  const [bookingMemberSearchQuery, setBookingMemberSearchQuery] = useState('');
+  const [showBookingMemberSuggestions, setShowBookingMemberSuggestions] = useState(false);
+  const [bookingMemberHighlightIndex, setBookingMemberHighlightIndex] = useState(0);
+  const [allBookings, setAllBookings] = useState<any[]>([]);
+
+  const fetchBookings = useCallback(() => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+    fetch('http://localhost:3001/bookings', { headers })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllBookings(data);
+        }
+      })
+      .catch(err => console.error('Error fetching bookings:', err));
+  }, []);
 
   const loadStatsAndRecent = useCallback((headers: HeadersInit, dateStr: string) => {
     Promise.all([
@@ -99,12 +119,14 @@ export function StaffCheckinPage() {
     Promise.all([
       fetch('http://localhost:3001/facilities/equipment/list', { headers }).then(res => res.json()),
       fetch('http://localhost:3001/users/members', { headers }).then(res => res.json()),
-      fetch('http://localhost:3001/facilities/reports/list', { headers }).then(res => res.json())
+      fetch('http://localhost:3001/facilities/reports/list', { headers }).then(res => res.json()),
+      fetch('http://localhost:3001/bookings', { headers }).then(res => res.json())
     ])
-      .then(([equipmentData, membersData, reportsData]) => {
+      .then(([equipmentData, membersData, reportsData, bookingsData]) => {
         setEquipmentList(Array.isArray(equipmentData) ? equipmentData : []);
         setMembersList(Array.isArray(membersData) ? membersData : []);
         setReportsList(Array.isArray(reportsData) ? reportsData : []);
+        setAllBookings(Array.isArray(bookingsData) ? bookingsData : []);
         setLoading(false);
       })
       .catch(err => {
@@ -172,10 +194,84 @@ export function StaffCheckinPage() {
 
   const handleCancel = () => { setMember(null); setQuery(''); setCheckedIn(false); };
 
+  const handleBookingMemberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showBookingMemberSuggestions && filteredBookingMemberSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setBookingMemberHighlightIndex(prev => (prev + 1) % filteredBookingMemberSuggestions.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setBookingMemberHighlightIndex(prev => (prev - 1 + filteredBookingMemberSuggestions.length) % filteredBookingMemberSuggestions.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSelectBookingMember(filteredBookingMemberSuggestions[bookingMemberHighlightIndex]);
+      } else if (e.key === 'Escape') {
+        setShowBookingMemberSuggestions(false);
+      }
+    }
+  };
+
+  const handleSelectBookingMember = (item: any) => {
+    setSelectedBookingMemberId(item.id);
+    setBookingMemberSearchQuery(item.fullName);
+    setShowBookingMemberSuggestions(false);
+  };
+
+  const handleBookingCheckin = (bookingId: number, userId: number) => {
+    const token = localStorage.getItem('token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    fetch(`http://localhost:3001/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ attendanceStatus: 'checked_in' })
+    })
+      .then(async res => {
+        if (!res.ok) throw new Error('Không thể điểm danh ca tập');
+        return res.json();
+      })
+      .then(() => {
+        return fetch('http://localhost:3001/checkins', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            userId,
+            checkinMethod: 'QR_staff'
+          })
+        });
+      })
+      .then(async res => {
+        if (!res.ok) {
+          console.warn('General check-in failed or already recorded.');
+        }
+        toast.success('Điểm danh ca tập thành công!');
+        fetchBookings();
+        loadStatsAndRecent(headers, filterDate);
+      })
+      .catch(err => {
+        toast.error(err.message || 'Lỗi khi điểm danh ca tập');
+      });
+  };
+
   // Filter suggestions locally
   const filteredSuggestions = query.trim()
     ? membersList.filter(m => {
         const q = query.trim().toLowerCase();
+        const code = `HV${String(m.id).padStart(3, '0')}`.toLowerCase();
+        return (
+          m.fullName.toLowerCase().includes(q) ||
+          (m.phone && m.phone.includes(q)) ||
+          code.includes(q)
+        );
+      }).slice(0, 7)
+    : [];
+
+  const filteredBookingMemberSuggestions = bookingMemberSearchQuery.trim()
+    ? membersList.filter(m => {
+        const q = bookingMemberSearchQuery.trim().toLowerCase();
         const code = `HV${String(m.id).padStart(3, '0')}`.toLowerCase();
         return (
           m.fullName.toLowerCase().includes(q) ||
@@ -366,6 +462,128 @@ export function StaffCheckinPage() {
                 Quét tiếp
               </button>
             </div>
+          )}
+        </div>
+
+        {/* Check-in theo Lịch tập (Ca) */}
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-4 h-4 text-orange-500" />
+            <h2 className="text-sm font-bold text-[var(--foreground)]">Check-in theo ca đặt lịch</h2>
+          </div>
+
+          <div className="mb-4 relative z-10">
+            <label className="text-xs font-semibold text-[var(--muted-foreground)] mb-1 block">Chọn hội viên:</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={bookingMemberSearchQuery}
+                onChange={(e) => {
+                  setBookingMemberSearchQuery(e.target.value);
+                  setShowBookingMemberSuggestions(true);
+                  setBookingMemberHighlightIndex(0);
+                  if (!e.target.value) {
+                    setSelectedBookingMemberId(null);
+                  }
+                }}
+                onFocus={() => setShowBookingMemberSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowBookingMemberSuggestions(false), 200)}
+                onKeyDown={handleBookingMemberKeyDown}
+                placeholder="Nhập tên, SĐT hoặc mã hội viên để lọc..."
+                className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-orange-400 bg-[var(--background)]"
+              />
+              {showBookingMemberSuggestions && bookingMemberSearchQuery.trim() && filteredBookingMemberSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto pr-1">
+                  {filteredBookingMemberSuggestions.map((item, index) => {
+                    const code = `HV${String(item.id).padStart(3, '0')}`;
+                    return (
+                      <div
+                        key={item.id}
+                        onMouseDown={() => handleSelectBookingMember(item)}
+                        className={`px-3 py-2 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                          index === bookingMemberHighlightIndex
+                            ? 'bg-orange-500/15 text-orange-500 font-semibold'
+                            : 'hover:bg-[var(--secondary)] text-[var(--foreground)]'
+                        }`}
+                      >
+                        <div>
+                          <p className="font-bold text-xs">{item.fullName}</p>
+                          <p className="text-[10px] text-[var(--muted-foreground)]">{item.phone || 'Không có SĐT'}</p>
+                        </div>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--secondary)] border border-[var(--border)]">
+                          {code}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {selectedBookingMemberId ? (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center pb-2 border-b border-[var(--border)] text-xs text-[var(--muted-foreground)]">
+                <span>Danh sách ca đăng ký ngày: <strong className="text-[var(--foreground)]">{new Date(filterDate).toLocaleDateString('vi-VN')}</strong></span>
+                {selectedBookingMemberId && allBookings.filter(b => b.userId === selectedBookingMemberId && b.date === filterDate && b.status !== 'cancelled').length > 0 && (
+                  <span>Tìm thấy {allBookings.filter(b => b.userId === selectedBookingMemberId && b.date === filterDate && b.status !== 'cancelled').length} ca</span>
+                )}
+              </div>
+
+              {allBookings.filter(b => b.userId === selectedBookingMemberId && b.date === filterDate && b.status !== 'cancelled').length === 0 ? (
+                <p className="text-xs text-[var(--muted-foreground)] text-center py-6 border border-dashed border-[var(--border)] rounded-lg">
+                  Không tìm thấy ca đăng ký nào của hội viên này trong ngày đã chọn.
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {allBookings.filter(b => b.userId === selectedBookingMemberId && b.date === filterDate && b.status !== 'cancelled').map((b) => {
+                    const isCheckedIn = b.attendanceStatus === 'checked_in';
+                    const isAbsent = b.attendanceStatus === 'absent';
+                    return (
+                      <div key={b.id} className="p-3 bg-[var(--background)] border border-[var(--border)] rounded-lg flex justify-between items-center gap-2">
+                        <div className="space-y-1">
+                          <div className="text-sm font-bold text-[var(--foreground)] flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-orange-500" />
+                            {b.timeSlot}
+                          </div>
+                          <div className="text-xs text-[var(--muted-foreground)]">
+                            HLV: <span className="font-semibold text-[var(--foreground)]">{b.pt?.fullName || 'N/A'}</span>
+                          </div>
+                          <div className="text-xs text-[var(--muted-foreground)]">
+                            Phòng: <span className="font-semibold text-[var(--foreground)]">{b.room || 'Chưa xếp phòng'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isCheckedIn 
+                              ? 'bg-emerald-100 text-emerald-700' 
+                              : isAbsent 
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {isCheckedIn ? 'Đã check-in' : isAbsent ? 'Vắng mặt' : 'Chờ check-in'}
+                          </span>
+
+                          {!isCheckedIn && (
+                            <button
+                              onClick={() => handleBookingCheckin(b.id, b.userId)}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded transition-colors"
+                            >
+                              Check-in ca
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-[var(--muted-foreground)] text-center py-6 border border-dashed border-[var(--border)] rounded-lg">
+              Vui lòng chọn hội viên để hiển thị danh sách ca tập.
+            </p>
           )}
         </div>
 

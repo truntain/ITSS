@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Calendar, Users, FileText, TrendingUp, User } from 'lucide-react';
+import { Calendar, Users, FileText, TrendingUp, User, Star } from 'lucide-react';
 
 interface PTSidebarProps {
   activeMenu: string;
@@ -31,6 +31,7 @@ export function PTSidebar({ activeMenu, onMenuClick }: PTSidebarProps) {
     { id: 'clients', label: 'Danh sách Hội viên', icon: Users },
     { id: 'workouts', label: 'Bài tập & Giáo án', icon: FileText },
     { id: 'tracking', label: 'Đánh giá & Chỉ số', icon: TrendingUp },
+    { id: 'feedback', label: 'Đánh giá & Phản hồi', icon: Star },
   ];
 
   return (

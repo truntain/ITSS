@@ -55,8 +55,8 @@ export class BookingsController {
   }
 
   @Patch(':id')
-  @Roles('AD', 'PT')
-  @ApiOperation({ summary: 'Xác nhận/Hủy lịch hẹn hoặc điểm danh (Admin/PT)' })
+  @Roles('AD', 'PT', 'NV')
+  @ApiOperation({ summary: 'Xác nhận/Hủy lịch hẹn hoặc điểm danh (Admin/PT/NV)' })
   update(@Param('id') id: string, @Body() updateBookingDto: UpdateBookingDto) {
     return this.bookingsService.update(+id, updateBookingDto);
   }

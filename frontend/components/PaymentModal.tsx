@@ -61,6 +61,7 @@ export function PaymentModal({
       packageId: packageId,
       startDate: startDateStr,
       endDate: endDateStr,
+      status: 'paused',
     };
 
     fetch('http://localhost:3001/memberships', {

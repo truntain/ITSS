@@ -29,7 +29,7 @@ export class TrainersService {
   async findAllTrainers() {
     return this.userRepository.find({
       where: { role: 'PT', isActive: true },
-      select: { id: true, email: true, fullName: true, phone: true, gender: true, avatar: true, isActive: true, createdAt: true },
+      select: { id: true, email: true, fullName: true, phone: true, gender: true, avatar: true, isActive: true, status: true, createdAt: true },
       order: { fullName: 'ASC' },
     });
   }

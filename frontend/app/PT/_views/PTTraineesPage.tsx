@@ -323,9 +323,12 @@ export function PTTraineesPage() {
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">{selectedTrainee.name}</h2>
                   <p className="text-slate-600">{selectedTrainee.package}</p>
-                  <div className="flex gap-4 mt-2 text-sm text-slate-500">
+                  <div className="flex gap-4 mt-2 text-sm text-slate-500 flex-wrap items-center">
                     <span>📞 {selectedTrainee.phone}</span>
                     <span>📧 {selectedTrainee.email}</span>
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-semibold text-xs">
+                      Số buổi PT 1-1 còn lại: {selectedTrainee.sessionsLeft} buổi
+                    </span>
                   </div>
                 </div>
               </div>

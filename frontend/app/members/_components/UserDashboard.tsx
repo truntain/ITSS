@@ -12,45 +12,76 @@ interface UserDashboardProps {
 export function UserDashboard({ onMenuClick }: UserDashboardProps) {
   const [showCheckInModal, setShowCheckInModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState('');
-  const [selectedDay, setSelectedDay] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [membershipInfo, setMembershipInfo] = useState<any>(null);
   const [bodyRecords, setBodyRecords] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekDays, setWeekDays] = useState<any[]>([]);
   const [selectedQrCode, setSelectedQrCode] = useState('');
 
-  useEffect(() => {
-    // Generate week days dynamically (Monday to Sunday)
-    const todayDate = new Date();
-    const dayOfWeek = todayDate.getDay();
-    // Monday offset
-    const diff = todayDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    
-    const monday = new Date(todayDate);
-    monday.setDate(diff);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
 
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Monday of this week
+    const monday = new Date(today);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  });
+
+  // Helper to format Date to YYYY-MM-DD
+  const formatDateStr = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getWeekDays = () => {
     const days = [];
     const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    let todayIdx = 0;
-    
     for (let i = 0; i < 7; i++) {
-      const current = new Date(monday);
-      current.setDate(monday.getDate() + i);
-      const isToday = current.toDateString() === new Date().toDateString();
-      if (isToday) todayIdx = i;
-      
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + i);
       days.push({
-        day: dayNames[i],
-        date: String(current.getDate()).padStart(2, '0'),
-        fullDateStr: current.toISOString().split('T')[0],
-        isToday,
+        name: dayNames[i],
+        dateObj: date,
+        dateStr: formatDateStr(date),
+        dayNum: date.getDate(),
+        isToday: date.toDateString() === new Date().toDateString(),
+        isSelected: formatDateStr(date) === formatDateStr(selectedDate),
       });
     }
-    setWeekDays(days);
-    setSelectedDay(todayIdx);
+    return days;
+  };
 
+  const handlePrevWeek = () => {
+    setCurrentWeekStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() - 7);
+      return next;
+    });
+  };
+
+  const handleNextWeek = () => {
+    setCurrentWeekStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() + 7);
+      return next;
+    });
+  };
+
+  const handleDaySelect = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  useEffect(() => {
     // Get current user
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('currentUser');
@@ -134,7 +165,7 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
   const ptProgressPct = totalPt > 0 ? (usedPt / totalPt) * 100 : 0;
 
   // Filter bookings for current day
-  const selectedDateStr = weekDays[selectedDay]?.fullDateStr;
+  const selectedDateStr = formatDateStr(selectedDate);
   const filteredBookings = bookings.filter((b: any) => b.date === selectedDateStr && b.status !== 'cancelled');
 
   const getBookingImage = (type: string) => {
@@ -269,25 +300,94 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Weekly Schedule */}
           <div className="lg:col-span-3 space-y-6">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tight flex items-center gap-3">
-              <Flame className="w-8 h-8 text-[#FF5A00]" />
-              LỊCH TẬP TUẦN NÀY
-            </h2>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h2 className="text-3xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+                <Flame className="w-8 h-8 text-[#FF5A00]" />
+                LỊCH TẬP TUẦN NÀY
+              </h2>
+              
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Direct Calendar Datepicker */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[#A0A0A0] uppercase tracking-wider">Chọn ngày:</span>
+                  <input
+                    type="date"
+                    value={formatDateStr(selectedDate)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      const dateParts = val.split('-');
+                      const newDate = new Date(
+                        parseInt(dateParts[0]),
+                        parseInt(dateParts[1]) - 1,
+                        parseInt(dateParts[2])
+                      );
+                      newDate.setHours(0, 0, 0, 0);
+                      
+                      setSelectedDate(newDate);
+                      
+                      // Align the week strip
+                      const day = newDate.getDay();
+                      const diff = newDate.getDate() - day + (day === 0 ? -6 : 1);
+                      const monday = new Date(newDate);
+                      monday.setDate(diff);
+                      monday.setHours(0, 0, 0, 0);
+                      setCurrentWeekStart(monday);
+                    }}
+                    className="px-3 py-1.5 bg-[#242424] border border-[#333333] hover:border-[#FF5A00] text-white rounded-none text-sm outline-none focus:ring-1 focus:ring-[#FF5A00] transition-all cursor-pointer font-bold"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrevWeek}
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#242424] border border-[#333333] hover:border-[#FF5A00] text-[#A0A0A0] hover:text-[#FF5A00] rounded-none transition-colors cursor-pointer"
+                  >
+                    &larr; Tuần trước
+                  </button>
+                  <button
+                    onClick={() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      setSelectedDate(today);
+                      const day = today.getDay();
+                      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+                      const monday = new Date(today);
+                      monday.setDate(diff);
+                      monday.setHours(0, 0, 0, 0);
+                      setCurrentWeekStart(monday);
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#242424] border border-[#333333] hover:border-[#FF5A00] text-[#A0A0A0] hover:text-[#FF5A00] rounded-none transition-colors cursor-pointer"
+                  >
+                    Hôm nay
+                  </button>
+                  <button
+                    onClick={handleNextWeek}
+                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#242424] border border-[#333333] hover:border-[#FF5A00] text-[#A0A0A0] hover:text-[#FF5A00] rounded-none transition-colors cursor-pointer"
+                  >
+                    Tuần sau &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Day Selector */}
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-800">
-              {weekDays.map((day, index) => (
+              {getWeekDays().map((day, index) => (
                 <button
                   key={index}
-                  onClick={() => setSelectedDay(index)}
-                  className={`flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 font-bold transition-all focus:outline-none cursor-pointer ${
-                    selectedDay === index
+                  onClick={() => handleDaySelect(day.dateObj)}
+                  className={`flex-shrink-0 flex flex-col items-center justify-center w-20 h-20 font-bold transition-all focus:outline-none cursor-pointer relative ${
+                    day.isSelected
                       ? 'bg-[#FF5A00] text-white shadow-[0_0_25px_rgba(255,90,0,0.5)]'
                       : 'bg-[#242424] border border-[#333333] text-[#A0A0A0] hover:border-[#FF5A00]'
                   }`}
                 >
-                  <span className="text-xs uppercase">{day.day}</span>
-                  <span className="text-2xl font-black">{day.date}</span>
+                  <span className="text-xs uppercase">{day.name}</span>
+                  <span className="text-2xl font-black">{day.dayNum}</span>
+                  {day.isToday && !day.isSelected && (
+                    <span className="absolute bottom-1 w-1.5 h-1.5 bg-[#FF5A00] rounded-full mt-1 animate-pulse"></span>
+                  )}
                 </button>
               ))}
             </div>
@@ -332,7 +432,11 @@ export function UserDashboard({ onMenuClick }: UserDashboardProps) {
                               </div>
                               <div className="flex items-center gap-2">
                                 <UserIcon className="w-4 h-4" />
-                                <span>{session.pt ? `PT ${session.pt.fullName}` : 'Tập tự do'}</span>
+                                <span>
+                                  {session.pt && session.pt.id !== 11 && session.ptId !== 11
+                                    ? `PT ${session.pt.fullName}`
+                                    : 'Tự tập'}
+                                </span>
                               </div>
                             </div>
                           </div>

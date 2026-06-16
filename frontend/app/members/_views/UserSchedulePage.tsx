@@ -37,7 +37,11 @@ export function UserSchedulePage() {
           id: String(item.id),
           date: item.date,
           time: item.timeSlot,
-          trainer: item.pt ? `PT ${item.pt.fullName}` : 'Chưa xếp PT',
+          trainer: item.pt && item.pt.id !== 11 && item.ptId !== 11
+            ? `PT ${item.pt.fullName}`
+            : (item.pt && (item.pt.id === 11 || item.ptId === 11))
+              ? 'Tự tập'
+              : 'Chưa xếp PT',
           room: item.room || 'Chưa xếp phòng',
           type: item.type,
           status: item.status,
@@ -164,40 +168,40 @@ export function UserSchedulePage() {
       </div>
 
       {/* Calendar */}
-      <div className="bg-[#242424] border border-[#333333] shadow-2xl p-8">
+      <div className="bg-[#242424] border border-[#333333] shadow-2xl p-8 rounded-2xl">
         {/* Calendar Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-black text-white uppercase">{monthName}</h2>
-          <div className="flex gap-2">
+        <div className="flex items-center justify-between mb-8 border-b border-[#333333] pb-6">
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight">{monthName}</h2>
+          <div className="flex gap-3">
             <button
               onClick={handlePrevMonth}
-              className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors"
+              className="p-3 bg-[#1A1A1A] border-2 border-[#333333] hover:border-[#FF5A00] text-white transition-colors rounded-xl"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={handleNextMonth}
-              className="p-2 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white transition-colors"
+              className="p-3 bg-[#1A1A1A] border-2 border-[#333333] hover:border-[#FF5A00] text-white transition-colors rounded-xl"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-6 h-6" />
             </button>
           </div>
         </div>
 
         {/* Day Headers */}
-        <div className="grid grid-cols-7 gap-2 mb-4">
-          {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
-            <div key={day} className="text-center py-3 font-black text-[#A0A0A0] uppercase text-sm">
+        <div className="grid grid-cols-7 gap-3 mb-6">
+          {['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'].map((day) => (
+            <div key={day} className="text-center py-4 font-black text-[#A0A0A0] uppercase text-sm tracking-wider">
               {day}
             </div>
           ))}
         </div>
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-3">
           {days.map((day, index) => {
             if (day === null) {
-              return <div key={`empty-${index}`} className="aspect-square"></div>;
+              return <div key={`empty-${index}`} className="aspect-square bg-transparent rounded-xl"></div>;
             }
 
             const events = getEventsForDate(day);
@@ -206,17 +210,17 @@ export function UserSchedulePage() {
             return (
               <div
                 key={day}
-                className={`aspect-square border p-2 transition-all relative ${
+                className={`aspect-square border-2 p-3 transition-all relative rounded-xl flex flex-col justify-between ${
                   today
-                    ? 'border-[#FF5A00] bg-[#FF5A00]/10'
+                    ? 'border-[#FF5A00] bg-[#FF5A00]/10 shadow-[0_0_15px_rgba(255,90,0,0.15)]'
                     : events.length > 0
                       ? 'border-[#333333] bg-[#1A1A1A] hover:border-[#FF5A00] cursor-pointer'
-                      : 'border-[#333333] hover:border-[#444444]'
+                      : 'border-[#333333] bg-[#1d1d1d] hover:border-[#444444]'
                 }`}
               >
-                <div className="flex flex-col h-full">
+                <div className="flex flex-col h-full justify-between">
                   <span
-                    className={`text-sm font-bold ${
+                    className={`text-lg font-black ${
                       today ? 'text-[#FF5A00]' : events.length > 0 ? 'text-white' : 'text-[#A0A0A0]'
                     }`}
                   >
@@ -224,14 +228,15 @@ export function UserSchedulePage() {
                   </span>
 
                   {events.length > 0 && (
-                    <div className="mt-1 flex-1 space-y-1 overflow-hidden">
+                    <div className="mt-2 flex-1 space-y-1.5 overflow-hidden flex flex-col justify-end">
                       {events.map((event) => (
                         <button
                           key={event.id}
                           onClick={() => setSelectedEvent(event)}
-                          className="w-full text-left px-1 py-0.5 bg-[#FF5A00] text-white text-[10px] font-bold rounded hover:bg-[#FF6A10] transition-colors truncate"
+                          className="w-full text-left px-2.5 py-1 bg-[#FF5A00] text-white text-[11px] font-black rounded hover:bg-[#FF6A10] transition-colors truncate shadow-md"
+                          title={`${event.time} - ${event.type}`}
                         >
-                          {event.time.split(' - ')[0]}
+                          {event.time.split(' - ')[0]} - {event.type.split(' ')[0]}
                         </button>
                       ))}
                     </div>
@@ -239,7 +244,7 @@ export function UserSchedulePage() {
                 </div>
 
                 {today && (
-                  <div className="absolute top-1 right-1 w-2 h-2 bg-[#FF5A00] rounded-full shadow-[0_0_8px_rgba(255,90,0,0.8)]"></div>
+                  <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-[#FF5A00] rounded-full shadow-[0_0_10px_rgba(255,90,0,0.9)] animate-pulse"></div>
                 )}
               </div>
             );
@@ -251,33 +256,33 @@ export function UserSchedulePage() {
       {selectedEvent && (
         <>
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 animate-fadeIn"
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] animate-fadeIn"
             onClick={() => setSelectedEvent(null)}
           ></div>
 
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-[#242424] border-2 border-[#FF5A00] shadow-2xl max-w-lg w-full">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-[#242424] border-2 border-[#FF5A00] shadow-2xl max-w-lg w-full rounded-2xl overflow-hidden">
               {/* Header */}
-              <div className="p-6 border-b border-[#333333] flex items-center justify-between">
-                <h3 className="text-2xl font-black text-white uppercase">Chi tiết buổi tập</h3>
+              <div className="p-6 border-b border-[#333333] flex items-center justify-between bg-gradient-to-r from-[#FF5A00]/10 to-transparent">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Chi tiết buổi tập</h3>
                 <button
                   onClick={() => setSelectedEvent(null)}
-                  className="p-2 hover:bg-[#1A1A1A] rounded transition-colors"
+                  className="p-2 hover:bg-[#1A1A1A] rounded-lg transition-colors"
                 >
                   <X className="w-6 h-6 text-[#A0A0A0] hover:text-white" />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-6">
                 <div>
-                  <h4 className="text-3xl font-black text-[#FF5A00] mb-2">{selectedEvent.type}</h4>
+                  <h4 className="text-3xl font-black text-[#FF5A00] tracking-tight uppercase">{selectedEvent.type}</h4>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 text-white">
-                    <CalendarIcon className="w-5 h-5 text-[#FF5A00]" />
-                    <span>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 text-white text-base">
+                    <CalendarIcon className="w-6 h-6 text-[#FF5A00] flex-shrink-0" />
+                    <span className="font-medium">
                       {new Date(selectedEvent.date).toLocaleDateString('vi-VN', {
                         weekday: 'long',
                         year: 'numeric',
@@ -287,36 +292,36 @@ export function UserSchedulePage() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-white">
-                    <Clock className="w-5 h-5 text-[#FF5A00]" />
-                    <span className="font-bold">{selectedEvent.time}</span>
+                  <div className="flex items-center gap-4 text-white text-base">
+                    <Clock className="w-6 h-6 text-[#FF5A00] flex-shrink-0" />
+                    <span className="font-black text-[#FF5A00]">{selectedEvent.time}</span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-white">
-                    <User className="w-5 h-5 text-[#FF5A00]" />
-                    <span>{selectedEvent.trainer}</span>
+                  <div className="flex items-center gap-4 text-white text-base">
+                    <User className="w-6 h-6 text-[#FF5A00] flex-shrink-0" />
+                    <span>Huấn luyện viên: <strong className="font-bold text-white">{selectedEvent.trainer}</strong></span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-white">
-                    <MapPin className="w-5 h-5 text-[#FF5A00]" />
-                    <span>{selectedEvent.room}</span>
+                  <div className="flex items-center gap-4 text-white text-base">
+                    <MapPin className="w-6 h-6 text-[#FF5A00] flex-shrink-0" />
+                    <span>Khu vực: <strong className="font-bold text-white">{selectedEvent.room}</strong></span>
                   </div>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-[#333333] flex gap-3">
+              <div className="p-6 border-t border-[#333333] flex gap-4 bg-[#1A1A1A]/50">
                 <button
                   onClick={() => setSelectedEvent(null)}
-                  className="flex-1 px-6 py-3 bg-[#1A1A1A] border border-[#333333] hover:border-[#FF5A00] text-white font-bold uppercase transition-all"
+                  className="flex-1 px-6 py-3.5 bg-[#1A1A1A] border-2 border-[#333333] hover:border-[#FF5A00] text-white font-bold uppercase transition-all rounded-xl text-sm"
                 >
                   Đóng
                 </button>
                 <button
                   onClick={() => handleCancelEvent(selectedEvent.id)}
-                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-black uppercase transition-all shadow-lg"
+                  className="flex-1 px-6 py-3.5 bg-red-600 hover:bg-red-700 text-white font-black uppercase transition-all shadow-lg rounded-xl text-sm"
                 >
-                  Hủy lịch
+                  Hủy lịch tập
                 </button>
               </div>
             </div>

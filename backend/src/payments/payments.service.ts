@@ -269,7 +269,9 @@ export class PaymentsService {
 
       // Sessions check
       let totalSessions = 0;
-      if (pkg.benefits && typeof pkg.benefits === 'object' && typeof pkg.benefits.sessions === 'number') {
+      if (pkg.id === 'VIP_PT_3M' || pkg.name.includes('VIP Kèm PT 3 Tháng')) {
+        totalSessions = 36;
+      } else if (pkg.benefits && typeof pkg.benefits === 'object' && typeof pkg.benefits.sessions === 'number') {
         totalSessions = pkg.benefits.sessions;
       } else if (pkg.id.toLowerCase().includes('pt') || pkg.name.toLowerCase().includes('pt')) {
         totalSessions = 20; // Default sessions for PT packages

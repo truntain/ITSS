@@ -17,6 +17,40 @@ export class CheckinsService {
   ) {}
 
   async create(createCheckinDto: CreateCheckinDto) {
+    const activeMembership = await this.membershipsService.findActiveByUserId(createCheckinDto.userId);
+    if (activeMembership) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const existingTodayCheckin = await this.checkinRepository.findOne({
+        where: {
+          userId: createCheckinDto.userId,
+          checkedInAt: Between(startOfToday, endOfToday),
+        },
+      });
+
+      if (!existingTodayCheckin) {
+        // First check-in of the day: deduct 1 day
+        const currentEndDate = new Date(activeMembership.endDate);
+        currentEndDate.setDate(currentEndDate.getDate() - 1);
+
+        const y = currentEndDate.getFullYear();
+        const m = String(currentEndDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentEndDate.getDate()).padStart(2, '0');
+        const newEndDateStr = `${y}-${m}-${d}`;
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const status = newEndDateStr < todayStr ? 'expired' : 'active';
+
+        await this.membershipsService.update(activeMembership.id, {
+          endDate: newEndDateStr,
+          status,
+        });
+      }
+    }
+
     const checkin = this.checkinRepository.create(createCheckinDto);
     return this.checkinRepository.save(checkin);
   }

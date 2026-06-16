@@ -101,8 +101,8 @@ export class MembershipsController {
   }
 
   @Delete(':id')
-  @Roles('AD')
-  @ApiOperation({ summary: 'Xóa đăng ký hội viên (Admin)' })
+  @Roles('AD', 'NV')
+  @ApiOperation({ summary: 'Xóa đăng ký hội viên (Admin/Nhân viên)' })
   remove(@Param('id') id: string) {
     return this.membershipsService.remove(+id);
   }

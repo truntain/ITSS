@@ -395,7 +395,7 @@ export function StaffMembersPage() {
                   </p>
                 </div>
                 <div className="bg-[var(--secondary)] rounded-xl p-4">
-                  <p className="text-[var(--muted-foreground)] text-xs mb-1">Buổi PT còn lại</p>
+                  <p className="text-[var(--muted-foreground)] text-xs mb-1">Số buổi PT 1-1 còn lại</p>
                   <p className="text-[var(--foreground)] font-black text-sm">{selectedMember.ptSessions} buổi</p>
                 </div>
               </div>

@@ -9,8 +9,10 @@ interface Feedback {
   sender: string;
   preview: string;
   time: string;
-  stars: number;
+  stars?: number;
   full: string;
+  title: string;
+  type: string;
   replyContent?: string;
   status: 'pending' | 'responded';
 }
@@ -37,13 +39,36 @@ export function StaffFeedbackPage() {
             const dateStr = dateObj.toLocaleDateString('vi-VN');
             const formattedTime = `${timeStr} – ${dateStr}`;
 
+            let fbType = 'service';
+            let fbTitle = 'Ý kiến đóng góp';
+            let fbText = fb.content;
+            let ratingVal = undefined;
+
+            try {
+              const parsed = JSON.parse(fb.content);
+              fbType = parsed.type || 'service';
+              fbTitle = parsed.title || 'Ý kiến đóng góp';
+              fbText = parsed.content || '';
+              if (parsed.rating !== undefined && parsed.rating !== null) {
+                ratingVal = Number(parsed.rating);
+              }
+            } catch (e) {
+              const match = fb.content.match(/^\[(.*?)\]\s*(.*)/);
+              if (match) {
+                fbType = match[1];
+                fbText = match[2];
+              }
+            }
+
             return {
               id: fb.id,
               sender: fb.user?.fullName || 'Hội viên ẩn danh',
-              preview: fb.content.length > 40 ? fb.content.substring(0, 40) + '...' : fb.content,
+              preview: fbText.length > 40 ? fbText.substring(0, 40) + '...' : fbText,
               time: formattedTime,
-              stars: (fb.id % 3) + 3, // simulated rating (3, 4, 5)
-              full: fb.content,
+              stars: ratingVal,
+              full: fbText,
+              title: fbTitle,
+              type: fbType,
               replyContent: fb.replyContent,
               status: fb.status,
             };
@@ -157,12 +182,24 @@ export function StaffFeedbackPage() {
                   {isResolved ? 'Đã xử lý' : 'Chờ xử lý'}
                 </span>
               </div>
+              
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${fb.type === 'trainer' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-purple-100 text-purple-800 border border-purple-200'}`}>
+                  {fb.type === 'trainer' ? 'Huấn luyện viên' : 'Dịch vụ'}
+                </span>
+                <span className="text-xs font-bold text-[var(--foreground)] truncate">{fb.title}</span>
+              </div>
+
               <p className="text-xs text-[var(--muted-foreground)] truncate mb-1.5">{fb.preview}</p>
               <div className="flex items-center justify-between">
-                <div className="flex gap-0.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className={`w-3 h-3 ${i < fb.stars ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
-                  ))}
+                <div className="flex gap-0.5 min-h-[12px]">
+                  {fb.type === 'trainer' && fb.stars !== undefined ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className={`w-3 h-3 ${i < (fb.stars ?? 0) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-[var(--muted-foreground)] italic">Không có đánh giá sao</span>
+                  )}
                 </div>
                 <span className="text-[var(--muted-foreground)] text-[10px]">{fb.time}</span>
               </div>
@@ -177,7 +214,13 @@ export function StaffFeedbackPage() {
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 shadow-sm space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="font-bold text-[var(--foreground)]">{selected.sender}</h3>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${selected.type === 'trainer' ? 'bg-blue-100 text-blue-800 border border-blue-200' : 'bg-purple-100 text-purple-800 border border-purple-200'}`}>
+                    {selected.type === 'trainer' ? 'Huấn luyện viên' : 'Dịch vụ'}
+                  </span>
+                  <span className="text-sm font-bold text-[var(--foreground)]">{selected.title}</span>
+                </div>
+                <h3 className="font-bold text-[var(--foreground)] text-lg">{selected.sender}</h3>
                 <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{selected.time}</p>
               </div>
               <span className={`text-xs font-bold px-2 py-1 rounded-full ${selected.status === 'responded' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -185,12 +228,14 @@ export function StaffFeedbackPage() {
               </span>
             </div>
 
-            <div className="flex gap-1 items-center">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={`w-4 h-4 ${i < selected.stars ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
-              ))}
-              <span className="text-[var(--muted-foreground)] text-sm ml-1">{selected.stars}/5 sao</span>
-            </div>
+            {selected.type === 'trainer' && selected.stars !== undefined && (
+              <div className="flex gap-1 items-center bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg inline-flex">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className={`w-4 h-4 ${i < (selected.stars ?? 0) ? 'text-yellow-400 fill-yellow-400' : 'text-slate-200'}`} />
+                ))}
+                <span className="text-[var(--muted-foreground)] text-xs font-bold ml-1">{selected.stars}/5 sao</span>
+              </div>
+            )}
 
             <div className="bg-[var(--secondary)] rounded-lg p-3">
               <p className="text-xs font-semibold text-[var(--muted-foreground)] mb-1.5">Nội dung phản hồi</p>

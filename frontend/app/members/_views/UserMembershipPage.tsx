@@ -28,6 +28,7 @@ export function UserMembershipPage() {
     benefits: string[];
     price: string;
     durationMonths: number;
+    remainingSessions?: number;
   } | null>(null);
 
   // All unique packages the user has ever registered (for renewal dropdown)
@@ -162,6 +163,7 @@ export function UserMembershipPage() {
             benefits: formatBenefits(priPkg.benefits),
             price: String(priPkg.price),
             durationMonths: priPkg.durationMonths,
+            remainingSessions: activeData.remainingSessions,
           });
         } else {
           setCurrentPackage(null);
@@ -258,11 +260,16 @@ export function UserMembershipPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
                   <div>
                     <p className="text-[#A0A0A0] text-sm mb-1">Thời hạn còn lại</p>
                     <p className="text-4xl font-black text-[#FF5A00]">{currentPackage.daysLeft}</p>
                     <p className="text-white text-sm">ngày</p>
+                  </div>
+                  <div>
+                    <p className="text-[#A0A0A0] text-sm mb-1">Số buổi PT 1-1 còn lại</p>
+                    <p className="text-4xl font-black text-[#FF5A00]">{currentPackage.remainingSessions ?? 0}</p>
+                    <p className="text-white text-sm">buổi</p>
                   </div>
                   <div>
                     <p className="text-[#A0A0A0] text-sm mb-1">Ngày hết hạn</p>

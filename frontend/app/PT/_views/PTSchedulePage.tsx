@@ -142,31 +142,6 @@ export function PTSchedulePage() {
     fetchSchedules();
   }, []);
 
-  const handleAttendanceChange = (bookingId: number, attendance: 'present' | 'absent') => {
-    const token = localStorage.getItem('token');
-    const newAttendanceStatus = attendance === 'present' ? 'checked_in' : 'absent';
-
-    fetch(`http://localhost:3001/bookings/${bookingId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ attendanceStatus: newAttendanceStatus }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Cập nhật thất bại');
-        // Update local state to reflect change instantly
-        setAllBookings(prev =>
-          prev.map(b => (b.id === bookingId ? { ...b, attendanceStatus: newAttendanceStatus } : b))
-        );
-        toast.success('Đã lưu cập nhật điểm danh thành công!');
-      })
-      .catch(() => {
-        toast.error('Không thể cập nhật điểm danh');
-      });
-  };
-
   // Filter and map database bookings to UI schedule blocks for selectedDate
   const selectedDateStr = formatDateStr(selectedDate);
   const activeBookings = allBookings.filter(
@@ -174,15 +149,24 @@ export function PTSchedulePage() {
   );
 
   const scheduleBlocks: ScheduleBlock[] = activeBookings.map((item: any) => {
-    const todayStr = formatDateStr(new Date());
-    
     let displayStatus: 'present' | 'absent' | 'future';
-    if (item.date > todayStr) {
-      displayStatus = 'future';
-    } else if (item.attendanceStatus === 'checked_in') {
+    if (item.attendanceStatus === 'checked_in') {
       displayStatus = 'present';
     } else {
-      displayStatus = 'absent';
+      // Parse the timeSlot start time (e.g. "08:00 - 09:00" -> start time is "08:00")
+      const timeSlotStart = item.timeSlot ? item.timeSlot.split(' - ')[0] : '00:00';
+      const [hours, minutes] = timeSlotStart.split(':').map(Number);
+      
+      // Construct a Date object representing the booking's starting local date/time
+      const bookingDateTime = new Date(item.date);
+      bookingDateTime.setHours(hours, minutes, 0, 0);
+
+      const now = new Date();
+      if (now < bookingDateTime) {
+        displayStatus = 'future';
+      } else {
+        displayStatus = 'absent';
+      }
     }
 
     return {
@@ -435,30 +419,23 @@ export function PTSchedulePage() {
                   </div>
                 </div>
 
-                {/* Attendance Control */}
-                <div className="flex-shrink-0 flex items-center gap-3">
-                  <div className="inline-flex bg-slate-100 rounded-lg p-1 gap-1">
-                    <button
-                      onClick={() => handleAttendanceChange(block.id, 'present')}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                        block.attendance === 'present'
-                          ? 'bg-emerald-500 text-white shadow-md'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                      }`}
-                    >
+                {/* Status Display Badge */}
+                <div className="flex-shrink-0 flex items-center">
+                  {block.attendance === 'present' && (
+                    <span className="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
                       Có mặt
-                    </button>
-                    <button
-                      onClick={() => handleAttendanceChange(block.id, 'absent')}
-                      className={`px-4 py-2 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                        block.attendance === 'absent'
-                          ? 'bg-red-500 text-white shadow-md'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                      }`}
-                    >
+                    </span>
+                  )}
+                  {block.attendance === 'absent' && (
+                    <span className="px-4 py-2 rounded-lg text-sm font-bold bg-rose-100 text-rose-700 border border-rose-200">
                       Vắng mặt
-                    </button>
-                  </div>
+                    </span>
+                  )}
+                  {block.attendance === 'future' && (
+                    <span className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                      Chưa tới
+                    </span>
+                  )}
                 </div>
               </div>
             ))
