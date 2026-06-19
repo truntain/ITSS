@@ -487,8 +487,8 @@ SELECT setval('public.equipment_reports_id_seq', 2, true);
 
 -- 12. FEEDBACKS (Góp ý từ KH)
 INSERT INTO public.feedbacks (id, user_id, content, reply_content, replier_id, status, created_at, replied_at) VALUES
-(1, 2, 'Máy chạy bộ số 3 ở khu vực tầng 2 đang bị rít băng tải, mong phòng tập cử người kiểm tra và bảo trì sớm giúp mình.', 'đã sửa', 10, 'responded', '2026-06-12 08:30:00', '2026-06-13 22:32:40'),
-(2, 2, 'Cho mình hỏi tuần sau phòng tập có mở cửa vào ngày lễ không?', 'Chào bạn, phòng tập Gympro vẫn mở cửa hoạt động bình thường từ 6h00 đến 22h00 trong tất cả các ngày lễ nhé. Chúc bạn đi tập vui vẻ!', 1, 'responded', '2026-06-05 15:00:00', '2026-06-05 16:30:00'),
+(1, 2, '{"type":"service","title":"Bảo trì thiết bị","content":"Máy chạy bộ số 3 ở khu vực tầng 2 đang bị rít băng tải, mong phòng tập cử người kiểm tra và bảo trì sớm giúp mình."}', 'đã sửa', 10, 'responded', '2026-06-12 08:30:00', '2026-06-13 22:32:40'),
+(2, 2, '{"type":"service","title":"Lịch hoạt động ngày lễ","content":"Cho mình hỏi tuần sau phòng tập có mở cửa vào ngày lễ không?"}', 'Chào bạn, phòng tập Gympro vẫn mở cửa hoạt động bình thường từ 6h00 đến 22h00 trong tất cả các ngày lễ nhé. Chúc bạn đi tập vui vẻ!', 1, 'responded', '2026-06-05 15:00:00', '2026-06-05 16:30:00'),
 (3, 2, '{"type":"trainer","title":"hỗ trợ","content":"không sát sao","rating":1,"ptId":3}', NULL, NULL, 'pending', '2026-06-13 17:32:35', NULL);
 SELECT setval('public.feedbacks_id_seq', 3, true);
 
@@ -514,3 +514,9 @@ INSERT INTO public.workout_plans (id, pt_id, trainee_id, name, description, exer
 (1, 3, 2, 'Giáo án Hypertrophy - Tăng Cơ Toàn Diện', 'Tập trung vào các bài tập đa khớp (Compound) ở mức tạ 70-80% 1RM để kích thích phát triển cơ bắp, kết hợp giãn cơ cuối buổi.', '[{"day": "Buổi 1 (Ngực - Vai - Tay sau)", "workouts": [{"name": "Barbell Bench Press", "reps": "8-10", "rest": "90s", "sets": 4}, {"name": "Incline Dumbbell Press", "reps": "10-12", "rest": "60s", "sets": 3}, {"name": "Overhead Press", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Triceps Pushdown", "reps": "12-15", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (Lưng - Xô - Tay trước)", "workouts": [{"name": "Deadlift", "reps": "5-8", "rest": "120s", "sets": 3}, {"name": "Lat Pulldown", "reps": "10-12", "rest": "60s", "sets": 4}, {"name": "Barbell Row", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Bicep Curls", "reps": "12-15", "rest": "45s", "sets": 3}]}]', '2026-06-13'),
 (2, 3, 4, 'Giáo án Cardio & Giảm Mỡ', 'Kết hợp tập tạ nhẹ và các bài Cardio cường độ cao HIIT để tối ưu việc đốt cháy calo trong thời gian ngắn.', '[{"day": "Buổi 1 (Full Body & Cardio)", "workouts": [{"name": "Goblet Squat", "reps": "15", "rest": "60s", "sets": 3}, {"name": "Push ups", "reps": "AMRAP (Tối đa)", "rest": "60s", "sets": 3}, {"name": "Kettlebell Swing", "reps": "20", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (HIIT Treadmill)", "workouts": [{"name": "Đi bộ khởi động", "speed": "5.0 km/h", "duration": "5 phút"}, {"name": "Chạy nước rút (Sprint)", "speed": "14.0 km/h", "repeat": "8 lần", "duration": "30 giây"}, {"name": "Đi bộ nghỉ ngơi giữa các hiệp", "speed": "4.0 km/h", "repeat": "8 lần", "duration": "60 giây"}, {"name": "Đi bộ thả lỏng", "speed": "4.0 km/h", "duration": "5 phút"}]}]', '2026-06-13');
 SELECT setval('public.workout_plans_id_seq', 2, true);
+
+-- 1. Thêm cột pt_sessions vào bảng packages
+ALTER TABLE public.packages ADD COLUMN pt_sessions integer DEFAULT 0;
+-- 2. Cập nhật dữ liệu cho các gói hiện có
+UPDATE public.packages SET pt_sessions = 36 WHERE id = 'VIP_PT_3M';
+UPDATE public.packages SET pt_sessions = 0 WHERE id IN ('STANDARD_3M', 'BASIC_1M', 'PREMIUM_6M');

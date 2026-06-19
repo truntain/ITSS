@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Search, Plus, Edit, Trash2, Tag, Dumbbell, X, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -15,6 +15,7 @@ interface Package {
   activeMembers?: number;
   isVisible: boolean;
   benefits: string[];
+  ptSessions?: number;
 }
 
 interface Voucher {
@@ -132,7 +133,7 @@ export function PackagesPage() {
     name: '',
     price: '',
     duration: '1 tháng',
-    type: 'Cơ bản',
+    ptSessions: '0',
   });
 
   const [formErrors, setFormErrors] = useState({
@@ -178,11 +179,12 @@ export function PackagesPage() {
     try {
       const payload = {
         name: formData.name.trim(),
-        type: formData.type,
+        type: 'Standard',
         durationMonths: formatUiDurationToMonths(formData.duration),
         price: Number(formData.price),
         benefits: benefits,
         isVisible: true,
+        ptSessions: Number(formData.ptSessions || 0),
       };
 
       let res;
@@ -216,7 +218,7 @@ export function PackagesPage() {
 
       setSuccessMessage(editingPackage ? 'Cập nhật gói tập thành công!' : 'Thêm gói tập thành công!');
       setShowPackageModal(false);
-      setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+      setFormData({ code: '', name: '', price: '', duration: '1 tháng', ptSessions: '0' });
       setBenefits([]);
       setEditingPackage(null);
 
@@ -349,8 +351,7 @@ export function PackagesPage() {
 
   const filteredPackages = packages.filter(pkg =>
     pkg.isVisible !== false && (
-      pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pkg.type.toLowerCase().includes(searchTerm.toLowerCase())
+      pkg.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
 
@@ -481,7 +482,7 @@ export function PackagesPage() {
         <button
           onClick={() => {
             if (activeTab === 'packages') {
-              setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+              setFormData({ code: '', name: '', price: '', duration: '1 tháng', ptSessions: '0' });
               setFormErrors({ code: false, name: false, price: false, benefits: false });
               setBenefits([]);
               setEditingPackage(null);
@@ -509,7 +510,7 @@ export function PackagesPage() {
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Mã gói</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Tên gói</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Loại gói</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Số buổi PT</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Thời hạn</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Mức giá</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-[var(--foreground)]">Hội viên đang dùng</th>
@@ -526,10 +527,8 @@ export function PackagesPage() {
                         <span className="font-bold text-[var(--foreground)]">{pkg.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeBadge(pkg.type)}`}>
-                        {pkg.type}
-                      </span>
+                    <td className="px-6 py-4 text-sm text-[var(--foreground)] font-semibold">
+                      {pkg.ptSessions || 0} buổi
                     </td>
                     <td className="px-6 py-4 text-sm text-[var(--foreground)]">
                       {formatDurationMonthsToUi(pkg.durationMonths)}
@@ -551,7 +550,7 @@ export function PackagesPage() {
                               name: pkg.name,
                               price: pkg.price.toString(),
                               duration: formatDurationMonthsToUi(pkg.durationMonths),
-                              type: pkg.type,
+                              ptSessions: (pkg.ptSessions || 0).toString(),
                             });
                             setShowPackageModal(true);
                           }}
@@ -686,7 +685,7 @@ export function PackagesPage() {
               setShowPackageModal(false);
               setEditingPackage(null);
               setBenefits([]);
-              setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+              setFormData({ code: '', name: '', price: '', duration: '1 tháng', ptSessions: '0' });
               setFormErrors({ code: false, name: false, price: false, benefits: false });
             }}
           ></div>
@@ -703,7 +702,7 @@ export function PackagesPage() {
                     setShowPackageModal(false);
                     setEditingPackage(null);
                     setBenefits([]);
-                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', ptSessions: '0' });
                     setFormErrors({ code: false, name: false, price: false, benefits: false });
                   }}
                   className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
@@ -794,17 +793,16 @@ export function PackagesPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                    Loại gói
+                    Số buổi kèm PT
                   </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  <input
+                    type="number"
+                    value={formData.ptSessions}
+                    onChange={(e) => setFormData({ ...formData, ptSessions: e.target.value })}
+                    placeholder="0"
+                    min="0"
                     className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#FF7A00]"
-                  >
-                    <option>Cơ bản</option>
-                    <option>VIP</option>
-                    <option>PT Kèm 1-1</option>
-                  </select>
+                  />
                 </div>
 
                 {/* Benefits Section */}
@@ -861,7 +859,7 @@ export function PackagesPage() {
                     setShowPackageModal(false);
                     setEditingPackage(null);
                     setBenefits([]);
-                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', type: 'Cơ bản' });
+                    setFormData({ code: '', name: '', price: '', duration: '1 tháng', ptSessions: '0' });
                     setFormErrors({ code: false, name: false, price: false, benefits: false });
                   }}
                   className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors"

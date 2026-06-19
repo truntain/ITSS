@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Star, Send, Paperclip, X, Filter, MessageCircle, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -32,7 +32,9 @@ export function SupportPage() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [ratingFilter, setRatingFilter] = useState<number | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'trainer' | 'service'>('all');
   const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
+  const [trainers, setTrainers] = useState<any[]>([]);
 
   const API_BASE = 'http://localhost:3001';
   const getToken = () => localStorage.getItem('token') || '';
@@ -64,15 +66,93 @@ export function SupportPage() {
     }
   }, [API_BASE]);
 
+  const fetchTrainers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/trainers`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrainers(data);
+      }
+    } catch (err) {
+      console.error('Error fetching trainers:', err);
+    }
+  }, [API_BASE]);
+
   useEffect(() => {
     fetchFeedbacks();
-  }, [fetchFeedbacks]);
+    fetchTrainers();
+  }, [fetchFeedbacks, fetchTrainers]);
 
-  // Lọc theo rating (mặc định tất cả đều là 5 sao vì DB không lưu cột rating)
-  const filteredFeedbacks = feedbacks.filter(() => {
-    if (ratingFilter === 'all') return true;
-    return 5 === ratingFilter;
-  });
+  const ptMap = new Map<number, string>(trainers.map(t => [t.id, t.fullName]));
+
+  const parseFeedbackContent = (content: string) => {
+    try {
+      const parsed = JSON.parse(content);
+      return {
+        type: parsed.type || 'other',
+        title: parsed.title || '',
+        bodyContent: parsed.content || content,
+        rating: typeof parsed.rating === 'number' ? parsed.rating : null,
+        ptId: typeof parsed.ptId === 'number' ? parsed.ptId : null,
+      };
+    } catch (e) {
+      const match = content.match(/^\[(.*?)\]\s*(.*)/);
+      if (match) {
+        return {
+          type: match[1],
+          title: match[2],
+          bodyContent: content,
+          rating: null,
+          ptId: null,
+        };
+      }
+      return {
+        type: 'other',
+        title: '',
+        bodyContent: content,
+        rating: null,
+        ptId: null,
+      };
+    }
+  };
+
+  // Lọc theo type và rating
+  const filteredFeedbacks = feedbacks
+    .filter((f) => {
+      const parsed = parseFeedbackContent(f.content);
+      if (typeFilter !== 'all') {
+        if (parsed.type !== typeFilter) {
+          return false;
+        }
+        if (typeFilter === 'trainer' && ratingFilter !== 'all') {
+          return parsed.rating === ratingFilter;
+        }
+        return true;
+      }
+      
+      if (ratingFilter !== 'all') {
+        if (parsed.type === 'trainer') {
+          return parsed.rating === ratingFilter;
+        }
+        return true; // Giữ lại cơ sở vật chất và các loại khác
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      const parsedA = parseFeedbackContent(a.content);
+      const parsedB = parseFeedbackContent(b.content);
+      
+      if (parsedA.type === 'trainer' && parsedB.type !== 'trainer') {
+        return -1;
+      }
+      if (parsedA.type !== 'trainer' && parsedB.type === 'trainer') {
+        return 1;
+      }
+      return 0;
+    });
 
   const unprocessedFeedbacks = filteredFeedbacks.filter(f => f.status === 'pending');
   const resolvedFeedbacks = filteredFeedbacks.filter(f => f.status === 'responded');
@@ -198,6 +278,8 @@ export function SupportPage() {
     const name = feedback.user?.fullName || 'Hội viên';
     const initials = getInitials(name);
     const dateStr = formatDateTime(feedback.createdAt);
+    const parsed = parseFeedbackContent(feedback.content);
+    const ptName = parsed.ptId ? (ptMap.get(parsed.ptId) || `PT (ID: ${parsed.ptId})`) : '';
 
     return (
       <div className="p-4 bg-[var(--card)] rounded-lg border border-[var(--border)] shadow-sm hover:shadow-md transition-all">
@@ -208,12 +290,40 @@ export function SupportPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <p className="font-medium text-[var(--foreground)] truncate">{name}</p>
-              {renderStars(5)} {/* Mặc định 5 sao */}
+              {parsed.type === 'trainer' && renderStars(parsed.rating ?? 5)}
             </div>
             <p className="text-xs text-[var(--muted-foreground)]">{dateStr}</p>
           </div>
         </div>
-        <p className="text-sm text-[var(--foreground)] line-clamp-3 mb-3">{feedback.content}</p>
+
+        {/* Badges & Extra info */}
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          {parsed.type === 'trainer' && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase">
+              Đánh giá PT
+            </span>
+          )}
+          {parsed.type === 'service' && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+              Cơ sở vật chất
+            </span>
+          )}
+          {parsed.type === 'other' && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200 uppercase">
+              Khác
+            </span>
+          )}
+          {parsed.type === 'trainer' && ptName && (
+            <span className="text-xs text-[var(--muted-foreground)] font-medium">
+              PT: <strong className="text-[var(--foreground)]">{ptName}</strong>
+            </span>
+          )}
+        </div>
+
+        {parsed.title && (
+          <p className="text-sm font-bold text-[var(--foreground)] mb-1">{parsed.title}</p>
+        )}
+        <p className="text-sm text-[var(--muted-foreground)] line-clamp-3 mb-3 whitespace-pre-wrap">{parsed.bodyContent}</p>
 
         {/* Status Tags with Dropdown */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -297,27 +407,54 @@ export function SupportPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-[var(--foreground)]">Chăm sóc khách hàng</h2>
           <p className="text-[var(--muted-foreground)]">Quản lý phản hồi và đánh giá từ hội viên</p>
         </div>
 
-        {/* Rating Filter */}
-        <div className="relative">
-          <select
-            value={ratingFilter}
-            onChange={(e) => setRatingFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-[var(--primary)] appearance-none cursor-pointer"
-          >
-            <option value="all">Tất cả đánh giá</option>
-            <option value="5">5 Sao (Rất tốt)</option>
-            <option value="4">4 Sao (Tốt)</option>
-            <option value="3">3 Sao (Bình thường)</option>
-            <option value="2">2 Sao (Tệ)</option>
-            <option value="1">1 Sao (Rất tệ)</option>
-          </select>
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Type Filter */}
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                const val = e.target.value as 'all' | 'trainer' | 'service';
+                setTypeFilter(val);
+                if (val === 'service') {
+                  setRatingFilter('all');
+                }
+              }}
+              className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-[var(--primary)] appearance-none cursor-pointer"
+            >
+              <option value="all">Tất cả loại phản hồi</option>
+              <option value="trainer">Đánh giá Huấn luyện viên (PT)</option>
+              <option value="service">Đánh giá Cơ sở vật chất</option>
+            </select>
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+          </div>
+
+          {/* Rating Filter */}
+          {typeFilter !== 'service' && (
+            <div className="relative">
+              <select
+                value={ratingFilter}
+                onChange={(e) => setRatingFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                className="pl-10 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-[var(--primary)] appearance-none cursor-pointer"
+              >
+                <option value="all">Tất cả sao</option>
+                <option value="5">5 Sao (Rất tốt)</option>
+                <option value="4">4 Sao (Tốt)</option>
+                <option value="3">3 Sao (Bình thường)</option>
+                <option value="2">2 Sao (Tệ)</option>
+                <option value="1">1 Sao (Rất tệ)</option>
+              </select>
+              <Star className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -365,48 +502,79 @@ export function SupportPage() {
       </div>
 
       {/* Chat Modal */}
-      {selectedFeedback && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setSelectedFeedback(null)}
-          ></div>
+      {selectedFeedback && (() => {
+        const selectedParsed = parseFeedbackContent(selectedFeedback.content);
+        const selectedPtName = selectedParsed.ptId ? (ptMap.get(selectedParsed.ptId) || `PT (ID: ${selectedParsed.ptId})`) : '';
 
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-[var(--card)] rounded-lg border border-[var(--border)] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-              {/* Header */}
-              <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center text-white font-medium text-sm">
-                    {getInitials(selectedFeedback.user?.fullName || 'Hội viên')}
-                  </div>
-                  <div>
-                    <p className="font-medium text-[var(--foreground)]">{selectedFeedback.user?.fullName || 'Hội viên'}</p>
-                    <div className="flex items-center gap-2">
-                      {renderStars(5)}
-                      <span className="text-xs text-[var(--muted-foreground)]">{formatDateTime(selectedFeedback.createdAt)}</span>
+        return (
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setSelectedFeedback(null)}
+            ></div>
+
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-[var(--card)] rounded-lg border border-[var(--border)] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                {/* Header */}
+                <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center text-white font-medium text-sm">
+                      {getInitials(selectedFeedback.user?.fullName || 'Hội viên')}
+                    </div>
+                    <div>
+                      <p className="font-medium text-[var(--foreground)]">{selectedFeedback.user?.fullName || 'Hội viên'}</p>
+                      <div className="flex flex-col gap-1 mt-0.5">
+                        <div className="flex items-center gap-2">
+                          {selectedParsed.type === 'trainer' && renderStars(selectedParsed.rating ?? 5)}
+                          <span className="text-xs text-[var(--muted-foreground)]">{formatDateTime(selectedFeedback.createdAt)}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {selectedParsed.type === 'trainer' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase">
+                              Đánh giá PT
+                            </span>
+                          )}
+                          {selectedParsed.type === 'service' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                              Cơ sở vật chất
+                            </span>
+                          )}
+                          {selectedParsed.type === 'other' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-slate-700 border border-slate-200 uppercase">
+                              Khác
+                            </span>
+                          )}
+                          {selectedParsed.type === 'trainer' && selectedPtName && (
+                            <span className="text-xs text-[var(--muted-foreground)] font-medium">
+                              PT: <strong className="text-[var(--foreground)]">{selectedPtName}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  <button
+                    onClick={() => setSelectedFeedback(null)}
+                    className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-[var(--muted-foreground)]" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSelectedFeedback(null)}
-                  className="p-2 hover:bg-[var(--secondary)] rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-[var(--muted-foreground)]" />
-                </button>
-              </div>
 
-              {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: '400px' }}>
-                {/* Tin nhắn từ khách hàng */}
-                <div className="flex justify-start">
-                  <div className="max-w-[70%] bg-gray-200 text-[var(--foreground)] rounded-2xl rounded-bl-none px-4 py-3">
-                    <p className="text-sm">{selectedFeedback.content}</p>
-                    <p className="text-xs text-[var(--muted-foreground)] mt-1">
-                      {formatDateTime(selectedFeedback.createdAt)}
-                    </p>
+                {/* Chat Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: '400px' }}>
+                  {/* Tin nhắn từ khách hàng */}
+                  <div className="flex justify-start">
+                    <div className="max-w-[70%] bg-gray-200 text-slate-800 rounded-2xl rounded-bl-none px-4 py-3">
+                      {selectedParsed.title && (
+                        <p className="font-bold text-sm text-slate-900 mb-1">{selectedParsed.title}</p>
+                      )}
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedParsed.bodyContent}</p>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-1">
+                        {formatDateTime(selectedFeedback.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
                 {/* Tin nhắn trả lời từ Admin (nếu có) */}
                 {selectedFeedback.replyContent && (
@@ -454,7 +622,7 @@ export function SupportPage() {
             </div>
           </div>
         </>
-      )}
+      )})()}
     </div>
   );
 }

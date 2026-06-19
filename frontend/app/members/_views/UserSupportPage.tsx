@@ -291,8 +291,9 @@ export function UserSupportPage() {
                 type="text"
                 value={feedbackTitle}
                 onChange={(e) => setFeedbackTitle(e.target.value)}
-                placeholder="Mô tả ngắn gọn tiêu đề phản hồi..."
-                className="w-full bg-[#242424] border-2 border-[#333333] text-white rounded-xl px-5 py-4 text-base focus:outline-none focus:border-[#FF5A00] placeholder:text-[#555555]"
+                disabled={!feedbackType}
+                placeholder={feedbackType ? "Mô tả ngắn gọn tiêu đề phản hồi..." : "Vui lòng chọn loại phản hồi trước..."}
+                className="w-full bg-[#242424] border-2 border-[#333333] text-white rounded-xl px-5 py-4 text-base focus:outline-none focus:border-[#FF5A00] placeholder:text-[#555555] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -303,9 +304,10 @@ export function UserSupportPage() {
               <textarea
                 value={feedbackContent}
                 onChange={(e) => setFeedbackContent(e.target.value)}
+                disabled={!feedbackType}
                 rows={5}
-                placeholder="Nhập nội dung phản hồi chi tiết của bạn..."
-                className="w-full bg-[#242424] border-2 border-[#333333] text-white rounded-xl px-5 py-4 text-base focus:outline-none focus:border-[#FF5A00] placeholder:text-[#555555] resize-none"
+                placeholder={feedbackType ? "Nhập nội dung phản hồi chi tiết của bạn..." : "Vui lòng chọn loại phản hồi trước..."}
+                className="w-full bg-[#242424] border-2 border-[#333333] text-white rounded-xl px-5 py-4 text-base focus:outline-none focus:border-[#FF5A00] placeholder:text-[#555555] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -335,7 +337,8 @@ export function UserSupportPage() {
 
             <button
               type="submit"
-              className="w-full py-4 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-[#FF5A00]/30 text-base uppercase tracking-wider"
+              disabled={!feedbackType}
+              className="w-full py-4 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-[#FF5A00]/30 text-base uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-5 h-5" />
               GỬI PHẢN HỒI NGAY

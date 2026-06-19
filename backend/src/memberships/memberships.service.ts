@@ -74,14 +74,7 @@ export class MembershipsService {
     }
 
     if (createMembershipDto.totalSessions === undefined || createMembershipDto.totalSessions === null) {
-      let totalSessions = 0;
-      if (pkg.id === 'VIP_PT_3M' || pkg.name.includes('VIP Kèm PT 3 Tháng')) {
-        totalSessions = 36;
-      } else if (pkg.benefits && typeof pkg.benefits === 'object' && typeof pkg.benefits.sessions === 'number') {
-        totalSessions = pkg.benefits.sessions;
-      } else if (pkg.id.toLowerCase().includes('pt') || pkg.name.toLowerCase().includes('pt')) {
-        totalSessions = 20;
-      }
+      const totalSessions = pkg.ptSessions || 0;
       createMembershipDto.totalSessions = totalSessions;
       createMembershipDto.remainingSessions = totalSessions;
     }
@@ -97,6 +90,12 @@ export class MembershipsService {
       const remainingTime = new Date(activeMembership.endDate).getTime() - Date.now();
       if (remainingTime > 0) {
         extraDays = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
+      }
+
+      const carryoverSessions = activeMembership.remainingSessions || 0;
+      if (carryoverSessions > 0) {
+        createMembershipDto.totalSessions = (createMembershipDto.totalSessions || 0) + carryoverSessions;
+        createMembershipDto.remainingSessions = (createMembershipDto.remainingSessions || 0) + carryoverSessions;
       }
 
       // Expire/deactivate the old active membership
@@ -148,16 +147,24 @@ export class MembershipsService {
       // 1. Deactivate old active membership and calculate carryover days
       const activeMembership = await this.findActiveByUserId(existing.userId);
       let extraDays = 0;
+      let carryoverSessions = 0;
       if (activeMembership && activeMembership.id !== existing.id) {
         const remainingTime = new Date(activeMembership.endDate).getTime() - Date.now();
         if (remainingTime > 0) {
           extraDays = Math.ceil(remainingTime / (1000 * 60 * 60 * 24));
         }
+        carryoverSessions = activeMembership.remainingSessions || 0;
         activeMembership.status = 'expired';
         await this.membershipRepository.save(activeMembership);
       }
 
-      // 2. Adjust end date of the approved membership if there are carryover days
+      // 2. Adjust sessions if there are carryover sessions
+      if (carryoverSessions > 0) {
+        updateMembershipDto.totalSessions = (existing.totalSessions || 0) + carryoverSessions;
+        updateMembershipDto.remainingSessions = (existing.remainingSessions || 0) + carryoverSessions;
+      }
+
+      // 3. Adjust end date of the approved membership if there are carryover days
       if (extraDays > 0) {
         const currentEndDate = new Date(existing.endDate);
         currentEndDate.setDate(currentEndDate.getDate() + extraDays);

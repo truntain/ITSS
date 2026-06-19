@@ -21,6 +21,9 @@ export class Package {
   @Column({ type: 'jsonb' })
   benefits: any;
 
+  @Column({ name: 'pt_sessions', type: 'integer', default: 0 })
+  ptSessions: number;
+
   @Column({ name: 'is_visible', default: true })
   isVisible: boolean;
 

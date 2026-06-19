@@ -36,6 +36,12 @@ export class CreatePackageDto {
   @IsNotEmpty({ message: 'Quyền lợi không được để trống!' })
   benefits: any;
 
+  @ApiProperty({ example: 36, description: 'Số buổi tập PT 1-1 đi kèm gói tập', required: false })
+  @IsOptional()
+  @IsInt({ message: 'Số buổi PT phải là số nguyên!' })
+  @Min(0, { message: 'Số buổi PT không được nhỏ hơn 0!' })
+  ptSessions?: number;
+
   @ApiProperty({ example: true, description: 'Hiển thị gói tập trên hệ thống', required: false })
   @IsOptional()
   @IsBoolean({ message: 'Trạng thái hiển thị phải là Boolean!' })

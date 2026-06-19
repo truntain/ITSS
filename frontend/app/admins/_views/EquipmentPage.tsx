@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Dumbbell, AlertTriangle, Wrench, X, Camera, Plus, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -428,7 +428,7 @@ export function EquipmentPage() {
                   <h3 className="font-bold text-slate-900 mb-1">{equipment.name}</h3>
                   <p className="text-sm text-slate-600 mb-3">{categoryNames[equipment.category] || equipment.category}</p>
  
-                   <div className="space-y-2 mb-4">
+                   <div className="space-y-2">
                      <div className="flex items-center gap-2 text-sm">
                        <span className="text-slate-500">Vị trí:</span>
                        <span className="font-medium text-slate-900">{equipment.location}</span>
@@ -438,19 +438,6 @@ export function EquipmentPage() {
                        <span className="text-slate-500">Bảo trì: {equipment.lastMaintenance}</span>
                      </div>
                    </div>
- 
-                   {/* Report Issue Button */}
-                   <button
-                     onClick={() => {
-                       setShowReportModal(equipment);
-                       setDescription('');
-                       setDescriptionError(false);
-                     }}
-                     className="w-full py-2 bg-white border border-slate-300 hover:border-[#FF7A00] text-slate-700 hover:text-[#FF7A00] rounded-lg font-medium transition-all flex items-center justify-center gap-2"
-                   >
-                    <AlertTriangle className="w-4 h-4" />
-                    Báo sự cố
-                  </button>
                 </div>
               </div>
             ))}
