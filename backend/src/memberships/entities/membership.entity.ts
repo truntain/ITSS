@@ -15,6 +15,9 @@ export class Membership {
   @Column({ name: 'package_id', length: 50 })
   packageId: string;
 
+  @Column({ name: 'voucher_code', length: 50, nullable: true })
+  voucherCode?: string;
+
   @Column({ name: 'start_date', type: 'date' })
   startDate: string;
 

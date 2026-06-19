@@ -18,6 +18,7 @@ interface Equipment {
   lastMaintenance: string;
   issueDescription?: string;
   activeReportId?: number;
+  reportedAt?: string;
 }
 
 const categoryNames: Record<'Cardio' | 'Strength' | 'Classroom' | 'Others', string> = {
@@ -51,6 +52,13 @@ export function EquipmentPage() {
   const [successMessage, setSuccessMessage] = useState('');
   
   const [locationFilter, setLocationFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState<string>(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   
   const [availablePage, setAvailablePage] = useState(1);
   const [maintenancePage, setMaintenancePage] = useState(1);
@@ -117,6 +125,7 @@ export function EquipmentPage() {
             lastMaintenance: item.lastMaintenance ? new Date(item.lastMaintenance).toLocaleDateString('vi-VN') : 'Chưa bảo trì',
             issueDescription: activeReport?.description || undefined,
             activeReportId: activeReport?.id || undefined,
+            reportedAt: activeReport?.reportedAt || undefined,
           };
         });
         setEquipments(mapped);
@@ -319,10 +328,24 @@ export function EquipmentPage() {
       });
   };
 
+  const getLocalDateString = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const getFilteredEquipments = (status: 'available' | 'maintenance') => {
     return equipments.filter(eq => {
       const matchStatus = eq.status === status;
       const matchLocation = locationFilter === 'all' || eq.location === locationFilter;
+
+      if (status === 'maintenance' && dateFilter) {
+        if (!eq.reportedAt) return false;
+        const localReportDate = getLocalDateString(eq.reportedAt);
+        return matchStatus && matchLocation && localReportDate === dateFilter;
+      }
 
       return matchStatus && matchLocation;
     });
@@ -386,8 +409,8 @@ export function EquipmentPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
-        <div className="flex-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Vị trí</label>
           <select
             value={locationFilter}
@@ -399,6 +422,25 @@ export function EquipmentPage() {
               <option key={fac.id} value={fac.name}>{fac.name}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2 flex justify-between items-center">
+            <span>Ngày báo cáo sự cố</span>
+            {dateFilter && (
+              <button 
+                onClick={() => setDateFilter('')}
+                className="text-xs text-orange-500 hover:text-orange-600 font-semibold"
+              >
+                Xem tất cả ngày
+              </button>
+            )}
+          </label>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#FF7A00] focus:border-transparent"
+          />
         </div>
       </div>
 
@@ -483,6 +525,12 @@ export function EquipmentPage() {
                       <Wrench className="w-4 h-4 text-slate-500" />
                       <span className="text-slate-500">Bảo trì: {equipment.lastMaintenance}</span>
                     </div>
+                    {equipment.reportedAt && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 font-semibold bg-red-50 p-2 rounded-lg border border-red-100 mt-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <span>Báo lỗi: {new Date(equipment.reportedAt).toLocaleString('vi-VN')}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}

@@ -19,6 +19,8 @@ export function StaffSalesPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
+  const [vouchersList, setVouchersList] = useState<any[]>([]);
+  const [showVoucherSuggestions, setShowVoucherSuggestions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
 
@@ -54,8 +56,31 @@ export function StaffSalesPage() {
         if (!res.ok) throw new Error('Không thể duyệt gói tập');
         return res.json();
       })
-      .then(() => {
-        // 2. Create transaction record
+      .then(async () => {
+        // 2. Fetch voucher details if voucherCode was applied
+        let discountAmount = 0;
+        let voucherId = undefined;
+        const originalAmount = Number(tx.package?.price || 0);
+
+        if (tx.voucherCode) {
+          try {
+            const voucherRes = await fetch(`http://localhost:3001/payments/vouchers/code/${tx.voucherCode}`, { headers });
+            if (voucherRes.ok) {
+              const voucher = await voucherRes.json();
+              voucherId = voucher.id;
+              if (voucher.discountType === 'percent') {
+                discountAmount = (originalAmount * Number(voucher.discountValue)) / 100;
+              } else {
+                discountAmount = Number(voucher.discountValue);
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching voucher for approval:', e);
+          }
+        }
+
+        const finalAmount = Math.max(0, originalAmount - discountAmount);
+
         let cashierId = undefined;
         const userStr = localStorage.getItem('currentUser');
         if (userStr) {
@@ -64,16 +89,14 @@ export function StaffSalesPage() {
           } catch (e) {}
         }
 
-        const originalAmount = Number(tx.package?.price || 0);
-        const finalAmount = originalAmount;
-
         const payload = {
           receiptNo: `BILL-APPROVED-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
           userId: tx.userId,
           membershipId: tx.id,
           packageId: tx.packageId,
+          voucherId,
           originalAmount,
-          discountAmount: 0,
+          discountAmount,
           finalAmount,
           paymentMethod: 'Chuyển khoản',
           cashierId
@@ -168,9 +191,10 @@ export function StaffSalesPage() {
 
     Promise.all([
       fetch('http://localhost:3001/users/members', { headers }).then(res => res.json()),
-      fetch('http://localhost:3001/memberships/packages', { headers }).then(res => res.json())
+      fetch('http://localhost:3001/memberships/packages', { headers }).then(res => res.json()),
+      fetch('http://localhost:3001/payments/vouchers', { headers }).then(res => res.json())
     ])
-      .then(([membersData, packagesData]) => {
+      .then(([membersData, packagesData, vouchersData]) => {
         const formattedMembers = Array.isArray(membersData)
           ? membersData.map((m: any) => ({
               ...m,
@@ -187,6 +211,7 @@ export function StaffSalesPage() {
             }))
           : [];
         setPackages(formattedPackages);
+        setVouchersList(Array.isArray(vouchersData) ? vouchersData : []);
         setLoading(false);
       })
       .catch(err => {
@@ -208,8 +233,58 @@ export function StaffSalesPage() {
   const subtotal = selectedPackageData?.price || 0;
   const total = Math.max(0, subtotal - discount);
 
+  const isVoucherActive = (v: any) => {
+    if (!v) return false;
+    const todayStr = new Date().toISOString().split('T')[0];
+    return v.status === 'active' && todayStr >= v.startDate && todayStr <= v.endDate && v.used < v.total;
+  };
+
+  const filteredVouchers = vouchersList.filter((v) => {
+    if (!isVoucherActive(v)) return false;
+    if (voucherCode) {
+      return v.code.toLowerCase().includes(voucherCode.toLowerCase());
+    }
+    return true;
+  });
+
+  const applyVoucherObj = (voucher: any) => {
+    let calculatedDiscount = 0;
+    if (voucher.discountType === 'percent') {
+      calculatedDiscount = (subtotal * Number(voucher.discountValue)) / 100;
+    } else {
+      calculatedDiscount = Number(voucher.discountValue);
+    }
+    setDiscount(calculatedDiscount);
+    setSelectedVoucher(voucher);
+    toast.success(`Áp dụng voucher thành công! Giảm ${calculatedDiscount.toLocaleString('vi-VN')}đ`);
+  };
+
+  useEffect(() => {
+    if (selectedVoucher) {
+      let calculatedDiscount = 0;
+      if (selectedVoucher.discountType === 'percent') {
+        calculatedDiscount = (subtotal * Number(selectedVoucher.discountValue)) / 100;
+      } else {
+        calculatedDiscount = Number(selectedVoucher.discountValue);
+      }
+      setDiscount(calculatedDiscount);
+    } else {
+      setDiscount(0);
+    }
+  }, [selectedPackage, selectedVoucher, subtotal]);
+
   const handleApplyVoucher = () => {
     if (!voucherCode) return;
+    const match = vouchersList.find(v => v.code === voucherCode.toUpperCase());
+    if (match) {
+      if (isVoucherActive(match)) {
+        applyVoucherObj(match);
+      } else {
+        toast.error('Mã giảm giá đã hết hạn hoặc không hoạt động!');
+      }
+      return;
+    }
+
     const token = localStorage.getItem('token');
     const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -222,15 +297,7 @@ export function StaffSalesPage() {
         return data;
       })
       .then(voucher => {
-        let calculatedDiscount = 0;
-        if (voucher.discountType === 'percent') {
-          calculatedDiscount = (subtotal * Number(voucher.discountValue)) / 100;
-        } else {
-          calculatedDiscount = Number(voucher.discountValue);
-        }
-        setDiscount(calculatedDiscount);
-        setSelectedVoucher(voucher);
-        toast.success(`Áp dụng voucher thành công! Giảm ${calculatedDiscount.toLocaleString('vi-VN')}đ`);
+        applyVoucherObj(voucher);
       })
       .catch(err => {
         setDiscount(0);
@@ -313,9 +380,20 @@ export function StaffSalesPage() {
                     <div className="text-xs text-[var(--muted-foreground)]">
                       Đăng ký gói: <span className="font-semibold text-[var(--foreground)]">{tx.package?.name || tx.packageId}</span>
                     </div>
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      Số tiền: <span className="font-semibold text-orange-500">{Number(tx.package?.price || 0).toLocaleString('vi-VN')}đ</span>
-                    </div>
+                    {tx.voucherCode ? (
+                      <>
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          Giá gốc: <span className="line-through">{Number(tx.package?.price || 0).toLocaleString('vi-VN')}đ</span>
+                        </div>
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          Mã giảm giá: <span className="font-bold text-emerald-600">{tx.voucherCode}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-[var(--muted-foreground)]">
+                        Số tiền: <span className="font-semibold text-orange-500">{Number(tx.package?.price || 0).toLocaleString('vi-VN')}đ</span>
+                      </div>
+                    )}
                     <div className="text-[10px] text-[var(--muted-foreground)]">
                       Yêu cầu lúc: {new Date(tx.createdAt).toLocaleString('vi-VN')}
                     </div>
@@ -425,14 +503,47 @@ export function StaffSalesPage() {
             Mã giảm giá
           </h3>
 
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Nhập mã voucher (VD: WELCOME10)"
-              value={voucherCode}
-              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-              className="flex-1 px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-            />
+          <div className="flex gap-3 relative">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder="Nhập mã voucher (VD: WELCOME10)"
+                value={voucherCode}
+                onChange={(e) => {
+                  setVoucherCode(e.target.value.toUpperCase());
+                  setShowVoucherSuggestions(true);
+                }}
+                onFocus={() => setShowVoucherSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowVoucherSuggestions(false), 200)}
+                className="w-full px-4 py-2 bg-[var(--background)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
+              />
+              {showVoucherSuggestions && filteredVouchers.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                  {filteredVouchers.map((v) => (
+                    <div
+                      key={v.id}
+                      onMouseDown={() => {
+                        setVoucherCode(v.code);
+                        setSelectedVoucher(v);
+                        setShowVoucherSuggestions(false);
+                        applyVoucherObj(v);
+                      }}
+                      className="px-4 py-2 text-sm hover:bg-[var(--secondary)] cursor-pointer flex justify-between items-center border-b border-[var(--border)] last:border-0"
+                    >
+                      <div>
+                        <span className="font-bold text-[var(--primary)]">{v.code}</span>
+                        <span className="text-xs text-[var(--muted-foreground)] ml-2">
+                          ({v.discountType === 'percent' ? `Giảm ${v.discountValue}%` : `Giảm ${Number(v.discountValue).toLocaleString('vi-VN')}đ`})
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-[var(--muted-foreground)]">
+                        HSD: {new Date(v.endDate).toLocaleDateString('vi-VN')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleApplyVoucher}
               className="px-6 py-2 bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] rounded-lg font-medium transition-colors"

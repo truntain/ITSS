@@ -14,6 +14,12 @@ export class CreateMembershipDto {
   @MaxLength(50, { message: 'ID gói tập không được vượt quá 50 ký tự!' })
   packageId: string;
 
+  @ApiProperty({ example: 'SUMMER2026', description: 'Mã giảm giá áp dụng (nếu có)', required: false })
+  @IsOptional()
+  @IsString({ message: 'Mã giảm giá phải là chuỗi ký tự!' })
+  @MaxLength(50, { message: 'Mã giảm giá không được vượt quá 50 ký tự!' })
+  voucherCode?: string;
+
   @ApiProperty({ example: '2026-06-12', description: 'Ngày bắt đầu kích hoạt (YYYY-MM-DD)' })
   @IsNotEmpty({ message: 'Ngày bắt đầu không được để trống!' })
   @IsDateString({}, { message: 'Ngày bắt đầu không đúng định dạng YYYY-MM-DD!' })

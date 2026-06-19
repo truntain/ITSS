@@ -24,6 +24,9 @@ export function StaffCheckinPage() {
   const [issueDesc, setIssueDesc] = useState('');
   const [reportSent, setReportSent] = useState(false);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [selectedFloor, setSelectedFloor] = useState('');
+  const [selectedFacilityId, setSelectedFacilityId] = useState('');
+  const [facilitiesList, setFacilitiesList] = useState<any[]>([]);
 
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [membersList, setMembersList] = useState<any[]>([]);
@@ -120,13 +123,15 @@ export function StaffCheckinPage() {
       fetch('http://localhost:3001/facilities/equipment/list', { headers }).then(res => res.json()),
       fetch('http://localhost:3001/users/members', { headers }).then(res => res.json()),
       fetch('http://localhost:3001/facilities/reports/list', { headers }).then(res => res.json()),
-      fetch('http://localhost:3001/bookings', { headers }).then(res => res.json())
+      fetch('http://localhost:3001/bookings', { headers }).then(res => res.json()),
+      fetch('http://localhost:3001/facilities', { headers }).then(res => res.json())
     ])
-      .then(([equipmentData, membersData, reportsData, bookingsData]) => {
+      .then(([equipmentData, membersData, reportsData, bookingsData, facilitiesData]) => {
         setEquipmentList(Array.isArray(equipmentData) ? equipmentData : []);
         setMembersList(Array.isArray(membersData) ? membersData : []);
         setReportsList(Array.isArray(reportsData) ? reportsData : []);
         setAllBookings(Array.isArray(bookingsData) ? bookingsData : []);
+        setFacilitiesList(Array.isArray(facilitiesData) ? facilitiesData : []);
         setLoading(false);
       })
       .catch(err => {
@@ -350,12 +355,53 @@ export function StaffCheckinPage() {
           setReportSent(false);
           setEquipment('');
           setIssueDesc('');
+          setSelectedFloor('');
+          setSelectedFacilityId('');
         }, 1500);
       })
       .catch(err => {
         toast.error(err.message);
       });
   };
+
+  const getFloorFromFacility = (facility: any) => {
+    if (!facility) return '';
+    const searchStr = `${facility.address || ''} ${facility.name || ''}`;
+    const match = searchStr.match(/Tầng\s*(\d+)/i);
+    if (match) {
+      return `Tầng ${match[1]}`;
+    }
+    return 'Khác';
+  };
+
+  const floors = Array.from(
+    new Set(
+      facilitiesList
+        .map((f) => getFloorFromFacility(f))
+        .filter(Boolean)
+    )
+  ).sort();
+
+  const filteredFacilities = selectedFloor
+    ? facilitiesList.filter((f) => getFloorFromFacility(f) === selectedFloor)
+    : facilitiesList;
+
+  const filteredEquipment = equipmentList.filter((eq) => {
+    const facility = eq.facility || facilitiesList.find(f => f.id === eq.facilityId);
+    if (!facility) return false;
+    
+    // Filter by Floor
+    if (selectedFloor && getFloorFromFacility(facility) !== selectedFloor) {
+      return false;
+    }
+    
+    // Filter by Room
+    if (selectedFacilityId && facility.id !== Number(selectedFacilityId)) {
+      return false;
+    }
+    
+    return true;
+  });
 
   if (loading) {
     return (
@@ -700,20 +746,62 @@ export function StaffCheckinPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h3 className="font-bold text-slate-800">Báo lỗi thiết bị</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button 
+                onClick={() => {
+                  setShowModal(false);
+                  setSelectedFloor('');
+                  setSelectedFacilityId('');
+                  setEquipment('');
+                  setIssueDesc('');
+                }} 
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-4 space-y-3">
               <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chọn tầng</label>
+                <select
+                  value={selectedFloor}
+                  onChange={(e) => {
+                    setSelectedFloor(e.target.value);
+                    setSelectedFacilityId('');
+                    setEquipment('');
+                  }}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="">-- Tất cả các tầng --</option>
+                  {floors.map((floor) => (
+                    <option key={floor} value={floor}>{floor}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Chọn phòng tập</label>
+                <select
+                  value={selectedFacilityId}
+                  onChange={(e) => {
+                    setSelectedFacilityId(e.target.value);
+                    setEquipment('');
+                  }}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="">-- Tất cả các phòng --</option>
+                  {filteredFacilities.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Tên thiết bị</label>
                 <select
                   value={equipment}
                   onChange={(e) => setEquipment(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
                 >
                   <option value="">-- Chọn thiết bị --</option>
-                  {equipmentList.map((eq) => (
+                  {filteredEquipment.map((eq) => (
                     <option key={eq.id} value={eq.id}>{eq.code} – {eq.name}</option>
                   ))}
                 </select>
