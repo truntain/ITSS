@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, IsIn } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsIn, IsOptional } from 'class-validator';
 
 export class CreateStaffDto {
   @IsNotEmpty()
@@ -17,4 +17,8 @@ export class CreateStaffDto {
   @IsString()
   @IsIn(['Quản lý', 'PT', 'Lễ tân'])
   role: 'Quản lý' | 'PT' | 'Lễ tân';
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

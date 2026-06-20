@@ -29,4 +29,8 @@ export class CreateCustomerDto {
   @IsNotEmpty()
   @IsString()
   packageId: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
 }

@@ -14,7 +14,7 @@ export class StaffsService {
   ) {}
 
   async create(createStaffDto: CreateStaffDto) {
-    const { fullName, email, phone, role } = createStaffDto;
+    const { fullName, email, phone, role, password } = createStaffDto;
 
     const existing = await this.userRepository.findOne({ where: { email } });
     if (existing) {
@@ -22,7 +22,7 @@ export class StaffsService {
     }
 
     const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash('123456', salt); // Mật khẩu mặc định
+    const hashedPassword = await bcrypt.hash(password || '123456', salt); // Mật khẩu
 
     let dbRole: UserRole = 'NV';
     if (role === 'Quản lý') dbRole = 'AD';
@@ -65,6 +65,8 @@ export class StaffsService {
         status: true,
         isActive: true,
         createdAt: true,
+        birthDate: true,
+        gender: true,
       },
       order: {
         id: 'ASC',
@@ -88,6 +90,8 @@ export class StaffsService {
         status: true,
         isActive: true,
         createdAt: true,
+        birthDate: true,
+        gender: true,
       },
     });
 

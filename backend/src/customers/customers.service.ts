@@ -176,7 +176,7 @@ export class CustomersService {
 
   // Tạo hội viên mới
   async create(createCustomerDto: CreateCustomerDto, cashierId: number) {
-    const { fullName, email, phone, gender, birthDate, height, packageId } = createCustomerDto;
+    const { fullName, email, phone, gender, birthDate, height, packageId, password } = createCustomerDto;
 
     const existing = await this.userRepository.findOne({ where: { email } });
     if (existing) {
@@ -184,7 +184,7 @@ export class CustomersService {
     }
 
     const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash('123456', salt); // Mật khẩu mặc định
+    const hashedPassword = await bcrypt.hash(password || '123456', salt); // Mật khẩu
 
     // 1. Lưu User
     const newUser = this.userRepository.create({
