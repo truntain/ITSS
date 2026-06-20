@@ -54,7 +54,7 @@ describe('AuthService', () => {
 
   describe('register', () => {
     it('nếu báo lỗi BadRequestException nếu thiếu email hoặc mật khẩu', async () => {
-      await expect(service.register('', '123456')).rejects.toThrow(
+      await expect(service.register('', 'Gympro@123')).rejects.toThrow(
         BadRequestException,
       );
       await expect(service.register('test@gympro.com', '')).rejects.toThrow(
@@ -88,7 +88,7 @@ describe('AuthService', () => {
       // Act: Thực hiện đăng ký
       const result = await service.register(
         'newuser@gympro.com',
-        '123456',
+        'Gympro@123',
         'HV',
         'Nguyễn Văn A',
         '0123456789',
@@ -113,7 +113,10 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('nếu báo lỗi BadRequestException nếu thiếu email hoặc password', async () => {
-      await expect(service.login('', '123456')).rejects.toThrow(
+      await expect(service.login('', 'Gympro@123')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.login('test@gympro.com', '')).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -122,7 +125,7 @@ describe('AuthService', () => {
       mockUsersService.findOneByEmail.mockResolvedValue(null);
 
       await expect(
-        service.login('notfound@gympro.com', '123456'),
+        service.login('notfound@gympro.com', 'Gympro@123'),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -137,7 +140,7 @@ describe('AuthService', () => {
       // Mock bcrypt compare to return false
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
-      await expect(service.login('user@gympro.com', 'wrong_password')).rejects.toThrow(
+      await expect(service.login('user@gympro.com', 'Wrong@123')).rejects.toThrow(
         UnauthorizedException,
       );
     });
@@ -154,7 +157,7 @@ describe('AuthService', () => {
       mockJwtService.sign.mockReturnValue('mock-jwt-token-login');
       (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
 
-      const result = await service.login('user@gympro.com', '123456');
+      const result = await service.login('user@gympro.com', 'Gympro@123');
 
       expect(result).toEqual({
         access_token: 'mock-jwt-token-login',

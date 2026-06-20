@@ -50,7 +50,7 @@ describe('LoginPage Component', () => {
     const submitBtn = screen.getByRole('button', { name: 'Đăng nhập' });
 
     fireEvent.change(emailInput, { target: { value: 'wrong@gympro.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'wrongpass' } });
+    fireEvent.change(passwordInput, { target: { value: 'Wrong@123' } });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -70,7 +70,7 @@ describe('LoginPage Component', () => {
 
     // Act: Nhập thông tin chính xác và click đăng nhập
     fireEvent.change(emailInput, { target: { value: 'admin@gympro.com' } });
-    fireEvent.change(passwordInput, { target: { value: '123456' } });
+    fireEvent.change(passwordInput, { target: { value: 'Gympro@123' } });
     fireEvent.click(submitBtn);
 
     // Assert: Kỳ vọng Toast báo thành công, lưu localStorage và chuyển hướng trang

@@ -56,7 +56,7 @@ describe('Auth System (e2e)', () => {
     it('nếu đăng ký tài khoản thành công và trả về thông tin user kèm JWT token', async () => {
       const registerPayload = {
         email: 'e2e_user@gympro.com',
-        password: 'password123',
+        password: 'Gympro@123',
         fullName: 'Người Dùng E2E',
         phone: '0901234567',
       };
@@ -81,7 +81,7 @@ describe('Auth System (e2e)', () => {
     it('nếu báo lỗi khi đăng ký với email đã tồn tại', async () => {
       const duplicatePayload = {
         email: 'e2e_user@gympro.com', // Email đã được tạo ở test trước
-        password: 'password456',
+        password: 'Gympro@456',
         fullName: 'Trùng Lặp',
         phone: '0907654321',
       };
@@ -99,7 +99,7 @@ describe('Auth System (e2e)', () => {
     it('nếu đăng nhập thành công nếu đúng thông tin credentials', async () => {
       const loginPayload = {
         email: 'e2e_user@gympro.com',
-        password: 'password123',
+        password: 'Gympro@123',
       };
 
       const response = await request(app.getHttpServer())
@@ -114,7 +114,7 @@ describe('Auth System (e2e)', () => {
     it('nếu báo lỗi 401 khi đăng nhập sai mật khẩu', async () => {
       const invalidPayload = {
         email: 'e2e_user@gympro.com',
-        password: 'wrong_password',
+        password: 'Wrong@123',
       };
 
       const response = await request(app.getHttpServer())

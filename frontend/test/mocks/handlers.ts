@@ -4,7 +4,7 @@ export const handlers = [
   http.post('http://localhost:3001/auth/login', async ({ request }) => {
     const { email, password } = (await request.json()) as any;
     
-    if (email === 'admin@gympro.com' && password === '123456') {
+    if (email === 'admin@gympro.com' && password === 'Gympro@123') {
       return HttpResponse.json({
         access_token: 'mock-jwt-token-12345',
         user: {
