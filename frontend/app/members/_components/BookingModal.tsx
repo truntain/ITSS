@@ -17,6 +17,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('ALL');
+  const [remainingSessions, setRemainingSessions] = useState<number | null>(null);
 
   const getPTSpecialty = (name: string) => {
     if (name.includes('Trọng')) return 'STRENGTH CONDITIONING';
@@ -45,6 +46,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
       setSelectedTime('');
       setSearchQuery('');
       setSelectedSpecialty('ALL');
+      setRemainingSessions(null);
       return;
     }
 
@@ -55,7 +57,33 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    fetch('http://localhost:3001/trainers', { headers })
+    // Fetch active membership to check remaining sessions
+    const membershipPromise = fetch('http://localhost:3001/memberships/my-active', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch active membership');
+        return res.text();
+      })
+      .then(text => (text ? JSON.parse(text) : null))
+      .then(data => {
+        if (data) {
+          const sessions = data.remainingSessions ?? 0;
+          setRemainingSessions(sessions);
+          if (sessions <= 0) {
+            setSelectedPT('11'); // Default to self-training if no sessions left
+          }
+        } else {
+          setRemainingSessions(0);
+          setSelectedPT('11'); // Default to self-training if no active membership
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching active membership:', err);
+        setRemainingSessions(0);
+        setSelectedPT('11');
+      });
+
+    // Fetch trainers
+    const trainersPromise = fetch('http://localhost:3001/trainers', { headers })
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch trainers');
         return res.json();
@@ -69,12 +97,14 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
             specialty: getPTSpecialty(item.fullName),
           }));
         setTrainers(mapped);
-        setLoading(false);
       })
       .catch(err => {
         console.error('Error fetching trainers:', err);
-        setLoading(false);
       });
+
+    Promise.all([membershipPromise, trainersPromise]).finally(() => {
+      setLoading(false);
+    });
   }, [isOpen]);
 
   const isSlotPast = (slotTime: string, dateStr: string) => {
@@ -111,6 +141,11 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const handleConfirm = () => {
     if (!selectedPT || !selectedDate || !selectedTime) {
       alert('Vui lòng chọn đầy đủ thông tin');
+      return;
+    }
+
+    if (selectedPT !== '11' && (remainingSessions === null || remainingSessions <= 0)) {
+      alert('Bạn không còn buổi tập PT 1-1 nào. Vui lòng mua thêm gói tập có buổi PT để tiếp tục đặt lịch!');
       return;
     }
 
@@ -199,7 +234,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
               </label>
 
               {/* Mode Toggle: Kèm PT vs Không kèm PT */}
-              <div className="flex gap-3 mb-4">
+              <div className="flex gap-3 mb-2">
                 <button
                   type="button"
                   onClick={() => setSelectedPT('11')}
@@ -214,6 +249,10 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 <button
                   type="button"
                   onClick={() => {
+                    if (remainingSessions === null || remainingSessions <= 0) {
+                      alert('Bạn không còn buổi tập PT 1-1 nào. Vui lòng mua thêm gói tập có buổi PT để tiếp tục đặt lịch!');
+                      return;
+                    }
                     if (selectedPT === '11') {
                       setSelectedPT('');
                     }
@@ -227,6 +266,12 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   Kèm PT (Chọn HLV)
                 </button>
               </div>
+
+              {remainingSessions !== null && (
+                <div className="text-right text-xs font-bold text-[#A0A0A0] mb-4">
+                  Số buổi PT 1-1 còn lại của bạn: <span className="text-[#FF5A00]">{remainingSessions} buổi</span>
+                </div>
+              )}
 
               {selectedPT === '11' ? (
                 <div className="p-4 bg-[#1A1A1A] border-2 border-dashed border-[#333333] rounded-lg text-center text-[#A0A0A0] text-sm">
@@ -285,7 +330,13 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                             <button
                               key={trainer.id}
                               type="button"
-                              onClick={() => setSelectedPT(trainer.id)}
+                              onClick={() => {
+                                if (remainingSessions === null || remainingSessions <= 0) {
+                                  alert('Bạn không còn buổi tập PT 1-1 nào. Vui lòng mua thêm gói tập có buổi PT để tiếp tục đặt lịch!');
+                                  return;
+                                }
+                                setSelectedPT(trainer.id);
+                              }}
                               className={`p-4 border-2 text-left transition-all flex justify-between items-center ${
                                 selectedPT === trainer.id
                                   ? 'border-[#FF5A00] bg-[#FF5A00]/10'

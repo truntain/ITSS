@@ -67,19 +67,6 @@ export function StaffSidebar({ activeMenu, onMenuClick }: StaffSidebarProps) {
           );
         })}
       </nav>
-
-      <div className="p-4 border-t border-[var(--sidebar-border)]">
-        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--secondary)] transition-colors cursor-pointer">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center">
-            <span className="text-white font-medium text-sm">NV</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-[var(--foreground)] text-sm font-medium">{user?.fullName || 'Nguyễn Văn A'}</p>
-            <p className="text-[var(--muted-foreground)] text-xs">Ca: 06:00 – 14:00</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
-

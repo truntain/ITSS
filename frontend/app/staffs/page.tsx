@@ -10,6 +10,7 @@ import { StaffCheckinPage } from './_views/StaffCheckinPage';
 import { StaffMembersPage } from './_views/StaffMembersPage';
 import { StaffFeedbackPage } from './_views/StaffFeedbackPage';
 import { StaffSchedulePage } from './_views/StaffSchedulePage';
+import { StaffProfilePage } from './_views/StaffProfilePage';
 import { AuthGuard } from '../../components/AuthGuard';
 
 export default function StaffsPage() {
@@ -23,6 +24,7 @@ export default function StaffsPage() {
       case 'members': return 'Hồ sơ & Lịch sử hội viên';
       case 'feedback': return 'Phản hồi hội viên';
       case 'schedule': return 'Lịch làm việc & Thông báo';
+      case 'profile': return 'Hồ sơ cá nhân';
       default: return 'Bán hàng & Giao dịch';
     }
   };
@@ -34,6 +36,7 @@ export default function StaffsPage() {
       case 'members': return <StaffMembersPage />;
       case 'feedback': return <StaffFeedbackPage />;
       case 'schedule': return <StaffSchedulePage />;
+      case 'profile': return <StaffProfilePage />;
       default: return <StaffSalesPage />;
     }
   };
@@ -46,6 +49,7 @@ export default function StaffsPage() {
         <div className="ml-64">
           <StaffHeader
             pageTitle={getStaffPageTitle()}
+            onProfileClick={() => setActiveMenu('profile')}
             onLogout={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('currentUser');

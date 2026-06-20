@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Search, UserPlus, ChevronRight, AlertCircle, DollarSign, Calendar, X, TrendingUp, Check } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
@@ -48,12 +48,16 @@ export function CustomersPage() {
     birthDate: '',
     height: '',
     packageId: '',
+    password: '',
+    confirmPassword: '',
   });
   const [formErrors, setFormErrors] = useState({
     name: false,
     email: false,
     phone: false,
     packageId: false,
+    password: false,
+    confirmPassword: false,
   });
 
   const fetchCustomers = useCallback(() => {
@@ -131,6 +135,8 @@ export function CustomersPage() {
       email: !formData.email.trim() || !formData.email.includes('@'),
       phone: !formData.phone.trim(),
       packageId: !formData.packageId,
+      password: !formData.password || formData.password.length < 6,
+      confirmPassword: !formData.confirmPassword || formData.confirmPassword !== formData.password,
     };
 
     setFormErrors(errors);
@@ -154,6 +160,7 @@ export function CustomersPage() {
         birthDate: formData.birthDate || undefined,
         height: formData.height ? Number(formData.height) : undefined,
         packageId: formData.packageId,
+        password: formData.password,
       }),
     })
       .then(res => {
@@ -177,8 +184,17 @@ export function CustomersPage() {
           birthDate: '',
           height: '',
           packageId: '',
+          password: '',
+          confirmPassword: '',
         });
-        setFormErrors({ name: false, email: false, phone: false, packageId: false });
+        setFormErrors({
+          name: false,
+          email: false,
+          phone: false,
+          packageId: false,
+          password: false,
+          confirmPassword: false,
+        });
 
         setNotificationMessage('Thêm hội viên thành công!');
         setShowSuccessNotification(true);
@@ -701,6 +717,44 @@ export function CustomersPage() {
                     ))}
                   </select>
                   {formErrors.packageId && <p className="text-xs text-red-500 mt-1">Vui lòng chọn gói tập</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu khởi tạo (tối thiểu 6 ký tự)"
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password: e.target.value });
+                      setFormErrors({ ...formErrors, password: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.password ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.password && <p className="text-xs text-red-500 mt-1">Mật khẩu tối thiểu phải từ 6 ký tự</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Xác nhận mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Nhập lại mật khẩu khởi tạo"
+                    value={formData.confirmPassword}
+                    onChange={(e) => {
+                      setFormData({ ...formData, confirmPassword: e.target.value });
+                      setFormErrors({ ...formErrors, confirmPassword: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.confirmPassword ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.confirmPassword && <p className="text-xs text-red-500 mt-1">Mật khẩu xác nhận không trùng khớp</p>}
                 </div>
               </div>
 

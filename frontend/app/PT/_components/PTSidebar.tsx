@@ -69,19 +69,6 @@ export function PTSidebar({ activeMenu, onMenuClick }: PTSidebarProps) {
           );
         })}
       </nav>
-
-      {/* Profile Section */}
-      <div className="p-4 border-t border-slate-200">
-        <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg">
-          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center">
-            <User className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 text-sm">{currentUser?.fullName || 'Lê Minh Trọng'}</p>
-            <p className="text-xs text-emerald-700 font-medium">{currentUser?.role === 'PT' ? 'Huấn luyện viên' : currentUser?.role || 'Senior PT'}</p>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }

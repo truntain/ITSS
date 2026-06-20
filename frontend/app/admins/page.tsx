@@ -8,6 +8,7 @@ import { Header } from './_components/Header';
 import { NewDashboard } from './_components/NewDashboard';
 import { SchedulePage } from './_views/SchedulePage';
 import { EmployeesPage } from './_views/EmployeesPage';
+import { TrainersPage } from './_views/TrainersPage';
 import { CustomersPage } from './_views/CustomersPage';
 import { SupportPage } from './_views/SupportPage';
 import { EquipmentPage } from './_views/EquipmentPage';
@@ -27,7 +28,9 @@ export default function AdminsPage() {
       case 'schedule':
         return 'Lịch làm việc';
       case 'staff':
-        return 'Quản lý nhân viên';
+        return 'Quản lý nhân sự';
+      case 'trainers':
+        return 'Quản lý huấn luyện viên';
       case 'members':
         return 'Quản lý hội viên';
       case 'feedback':
@@ -53,6 +56,8 @@ export default function AdminsPage() {
         return <SchedulePage />;
       case 'staff':
         return <EmployeesPage />;
+      case 'trainers':
+        return <TrainersPage />;
       case 'members':
         return <CustomersPage />;
       case 'feedback':
@@ -88,6 +93,7 @@ export default function AdminsPage() {
         <div className="ml-64">
           <Header
             pageTitle={getPageTitle()}
+            onSettingsClick={() => setActiveMenu('gym')}
             onLogout={() => {
               localStorage.removeItem('token');
               localStorage.removeItem('currentUser');

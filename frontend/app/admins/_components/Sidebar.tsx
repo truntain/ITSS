@@ -9,7 +9,8 @@ import {
   Package,
   MessageSquare,
   BarChart3,
-  Calendar
+  Calendar,
+  Award
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,6 +24,7 @@ export function Sidebar({ activeMenu, onMenuClick }: SidebarProps) {
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'schedule', label: 'Lịch làm việc', icon: Calendar },
     { id: 'staff', label: 'Quản lý nhân sự', icon: UserCog },
+    { id: 'trainers', label: 'Quản lý HLV (PT)', icon: Award },
     { id: 'members', label: 'Quản lý khách hàng', icon: Users },
     { id: 'equipment', label: 'Quản lý thiết bị', icon: Dumbbell },
     { id: 'gym', label: 'Quản lý phòng tập', icon: Building2 },
@@ -55,7 +57,7 @@ export function Sidebar({ activeMenu, onMenuClick }: SidebarProps) {
               key={item.id}
               onClick={() => onMenuClick(item.id)}
               className={`
-                w-full flex items-center gap-3 px-6 py-3 transition-all relative
+                w-full flex items-center gap-3 px-6 py-3 transition-all relative cursor-pointer
                 ${isActive
                   ? 'bg-[var(--sidebar-accent)] text-[var(--sidebar-accent-foreground)]'
                   : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)]'
@@ -71,18 +73,6 @@ export function Sidebar({ activeMenu, onMenuClick }: SidebarProps) {
           );
         })}
       </nav>
-
-      <div className="p-4 border-t border-[var(--sidebar-border)]">
-        <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--secondary)] transition-colors cursor-pointer">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-orange-600 flex items-center justify-center">
-            <span className="text-white font-medium text-sm">AD</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-[var(--foreground)] text-sm font-medium">Admin User</p>
-            <p className="text-[var(--muted-foreground)] text-xs">Quản trị viên</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { Search, UserPlus, X, Mail, Phone, Calendar, Activity, ChevronDown, Check } from 'lucide-react';
+import { Search, UserPlus, X, Mail, Phone, Calendar, Activity, ChevronDown, Check, Trash2 } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Pagination } from '@/components/Pagination';
@@ -290,12 +290,16 @@ export function EmployeesPage() {
     email: '',
     phone: '',
     role: 'Lễ tân' as 'Quản lý' | 'PT' | 'Lễ tân',
+    password: '',
+    confirmPassword: '',
   });
   const [formErrors, setFormErrors] = useState({
     name: false,
     email: false,
     phone: false,
     role: false,
+    password: false,
+    confirmPassword: false,
   });
 
   const fetchEmployees = useCallback(() => {
@@ -370,6 +374,8 @@ export function EmployeesPage() {
       email: !formData.email.trim() || !formData.email.includes('@'),
       phone: !formData.phone.trim(),
       role: !formData.role,
+      password: !formData.password || formData.password.length < 6,
+      confirmPassword: !formData.confirmPassword || formData.confirmPassword !== formData.password,
     };
 
     setFormErrors(errors);
@@ -391,6 +397,7 @@ export function EmployeesPage() {
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         role: formData.role,
+        password: formData.password,
       }),
     })
       .then(res => {
@@ -406,8 +413,8 @@ export function EmployeesPage() {
         setShowAddModal(false);
 
         // Reset form
-        setFormData({ name: '', email: '', phone: '', role: 'Lễ tân' });
-        setFormErrors({ name: false, email: false, phone: false, role: false });
+        setFormData({ name: '', email: '', phone: '', role: 'Lễ tân', password: '', confirmPassword: '' });
+        setFormErrors({ name: false, email: false, phone: false, role: false, password: false, confirmPassword: false });
 
         // Show success notification
         setNotificationMessage('Thêm nhân sự thành công!');
@@ -416,6 +423,36 @@ export function EmployeesPage() {
       })
       .catch(err => {
         console.error('Lỗi khi thêm nhân sự:', err);
+        alert(err.message || 'Có lỗi xảy ra');
+      });
+  };
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa nhân sự này không? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    fetch(`${API_BASE}/staffs/${employeeId}`, {
+      method: 'DELETE',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || 'Xóa nhân sự thất bại');
+        }
+        return res.json();
+      })
+      .then(() => {
+        setSelectedEmployee(null);
+        fetchEmployees();
+        setNotificationMessage('Xóa nhân sự thành công!');
+        setShowSuccessNotification(true);
+        setTimeout(() => setShowSuccessNotification(false), 3000);
+      })
+      .catch(err => {
+        console.error('Lỗi khi xóa nhân sự:', err);
         alert(err.message || 'Có lỗi xảy ra');
       });
   };
@@ -779,6 +816,17 @@ export function EmployeesPage() {
                       </>
                     )}
                   </div>
+
+                  {/* Action Buttons */}
+                  <div className="pt-4 border-t border-[var(--border)]">
+                    <button
+                      onClick={() => handleDeleteEmployee(selectedEmployee.id)}
+                      className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer border border-red-200"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      Xóa nhân viên
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -945,6 +993,44 @@ export function EmployeesPage() {
                     }`}
                   />
                   {formErrors.phone && <p className="text-xs text-red-500 mt-1">Vui lòng nhập số điện thoại</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu khởi tạo (tối thiểu 6 ký tự)"
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({ ...formData, password: e.target.value });
+                      setFormErrors({ ...formErrors, password: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.password ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.password && <p className="text-xs text-red-500 mt-1">Mật khẩu tối thiểu phải từ 6 ký tự</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                    Xác nhận mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Nhập lại mật khẩu khởi tạo"
+                    value={formData.confirmPassword}
+                    onChange={(e) => {
+                      setFormData({ ...formData, confirmPassword: e.target.value });
+                      setFormErrors({ ...formErrors, confirmPassword: false });
+                    }}
+                    className={`w-full px-4 py-2 bg-[var(--background)] border rounded-lg text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent ${
+                      formErrors.confirmPassword ? 'border-red-500' : 'border-[var(--border)]'
+                    }`}
+                  />
+                  {formErrors.confirmPassword && <p className="text-xs text-red-500 mt-1">Mật khẩu xác nhận không trùng khớp</p>}
                 </div>
               </div>
 

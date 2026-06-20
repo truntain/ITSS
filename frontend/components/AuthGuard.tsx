@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, KeyRound } from "lucide-react";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,6 +14,28 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      try {
+        const response = await originalFetch(...args);
+        if (response.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("currentUser");
+          setIsSessionExpired(true);
+        }
+        return response;
+      } catch (error) {
+        throw error;
+      }
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -47,6 +69,38 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
       router.replace("/login");
     }
   }, [router, allowedRoles]);
+
+  if (isSessionExpired) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden animate-in fade-in zoom-in duration-300">
+          {/* Subtle background glows */}
+          <div className="absolute -top-10 -left-10 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          
+          <div className="w-16 h-16 bg-orange-500/10 border border-orange-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <KeyRound className="w-8 h-8 text-orange-500 animate-pulse" />
+          </div>
+          
+          <h3 className="text-2xl font-bold text-white mb-3">Phiên đăng nhập hết hạn</h3>
+          <p className="text-slate-400 text-sm leading-relaxed mb-8">
+            Phiên làm việc của bạn đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.
+          </p>
+          
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              localStorage.removeItem("currentUser");
+              window.location.href = "/login";
+            }}
+            className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            Đăng nhập lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!mounted || !authorized) {
     return (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, User, LogOut, Settings, Calendar } from 'lucide-react';
+import { Bell, User, LogOut, Settings, Calendar, ChevronDown } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface UserHeaderProps {
   activeMenu: string;
@@ -22,10 +23,14 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
 
   const fetchNotifications = () => {
     const token = localStorage.getItem('token');
-    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {};
+    if (!token) return;
+    const headers: HeadersInit = { 'Authorization': `Bearer ${token}` };
 
     fetch('http://localhost:3001/announcements', { headers })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) return [];
+        return res.json();
+      })
       .then(data => {
         if (Array.isArray(data)) {
           // Filter announcements: show general announcements, plus personal system notifications
@@ -50,7 +55,7 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
           }
         }
       })
-      .catch(err => console.error('Error fetching notifications:', err));
+      .catch(err => console.warn('Could not fetch notifications:', err.message));
   };
 
   useEffect(() => {
@@ -115,6 +120,11 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
     { id: 'support', label: 'PHẢN HỒI' },
   ];
 
+  const today = new Date(); // Today's actual date
+  const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  const dayOfWeek = dayNames[today.getDay()];
+  const formattedDate = format(today, 'dd/MM/yyyy');
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-lg bg-[#1A1A1A]/80 border-b border-[#333333] shadow-2xl">
       <div className="max-w-[1800px] mx-auto px-8 h-20 flex items-center justify-between">
@@ -127,12 +137,12 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
         </div>
 
         {/* Center: Navigation Links */}
-        <nav className="flex items-center gap-8">
+        <nav className="flex items-center gap-5 flex-shrink-0">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => onMenuClick(item.id)}
-              className={`relative text-sm font-bold uppercase tracking-wide transition-colors ${
+              className={`relative text-[15px] font-bold uppercase tracking-wide transition-colors whitespace-nowrap ${
                 activeMenu === item.id ? 'text-white' : 'text-[#A0A0A0] hover:text-white'
               }`}
             >
@@ -145,18 +155,18 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
         </nav>
 
         {/* Right: CTA Button + Notification + User Profile */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3.5 flex-shrink-0">
           {/* CTA Button */}
           <button
             onClick={onOpenBooking}
-            className="px-6 py-3 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase text-sm shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all flex items-center gap-2"
+            className="px-5 py-2.5 bg-[#FF5A00] hover:bg-[#FF6A10] text-white font-black uppercase text-[15px] shadow-lg hover:shadow-[0_0_25px_rgba(255,90,0,0.5)] transition-all flex items-center gap-2 whitespace-nowrap flex-shrink-0"
           >
-            <Calendar className="w-4 h-4" />
+            <Calendar className="w-4 h-4 flex-shrink-0" />
             ĐẶT LỊCH NGAY
           </button>
 
           {/* Notification Bell */}
-          <div className="relative" ref={bellRef}>
+          <div className="relative flex-shrink-0" ref={bellRef}>
             <button
               onClick={handleToggleNotifications}
               className="relative p-2 hover:bg-[#242424] rounded-lg transition-colors cursor-pointer"
@@ -203,18 +213,25 @@ export function UserHeader({ activeMenu, onMenuClick, onLogout, onOpenBooking }:
             )}
           </div>
 
+          <div className="flex items-center gap-1.5 text-[15px] whitespace-nowrap flex-shrink-0">
+            <span className="text-[#A0A0A0] whitespace-nowrap">Hôm nay:</span>
+            <span className="font-medium text-white whitespace-nowrap">{dayOfWeek}, {formattedDate}</span>
+          </div>
+
           {/* User Profile */}
-          <div className="relative" ref={menuRef}>
+          <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-3 px-3 py-2 hover:bg-[#242424] rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-2 p-1.5 hover:bg-[#242424] rounded-lg transition-colors cursor-pointer whitespace-nowrap"
             >
-              <div className="w-10 h-10 bg-gradient-to-br from-[#FF5A00] to-[#FF8C00] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(255,90,0,0.4)]">
-                <User className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-br from-[#FF5A00] to-[#FF8C00] rounded-full flex items-center justify-center shadow-sm flex-shrink-0">
+                <User className="w-4.5 h-4.5 text-white" />
               </div>
-              <span className="text-white font-bold">
-                {currentUser?.fullName ? currentUser.fullName.split(' ').pop() : 'Hội viên'}
-              </span>
+              <div className="text-left hidden sm:block whitespace-nowrap">
+                <p className="text-[15px] font-bold text-white leading-none whitespace-nowrap">{currentUser?.fullName || 'Hội viên'}</p>
+                <p className="text-[13px] text-[#A0A0A0] mt-1 whitespace-nowrap">Hội viên</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-[#A0A0A0] flex-shrink-0" />
             </button>
 
             {/* Dropdown Menu */}
