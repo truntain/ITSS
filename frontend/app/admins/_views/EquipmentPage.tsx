@@ -52,13 +52,7 @@ export function EquipmentPage() {
   const [successMessage, setSuccessMessage] = useState('');
   
   const [locationFilter, setLocationFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState<string>(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  });
+  const [dateFilter, setDateFilter] = useState<string>('');
   
   const [availablePage, setAvailablePage] = useState(1);
   const [maintenancePage, setMaintenancePage] = useState(1);
@@ -120,7 +114,7 @@ export function EquipmentPage() {
             name: item.name,
             category: item.category,
             image: categoryEmojis[item.category as 'Cardio' | 'Strength' | 'Classroom' | 'Others'] || '🏋️',
-            status: item.status === 'active' ? 'available' : 'maintenance',
+            status: activeReport ? 'maintenance' : 'available',
             location: item.facility?.name || 'Chưa xác định',
             lastMaintenance: item.lastMaintenance ? new Date(item.lastMaintenance).toLocaleDateString('vi-VN') : 'Chưa bảo trì',
             issueDescription: activeReport?.description || undefined,
