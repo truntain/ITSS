@@ -356,19 +356,19 @@ FOR EACH ROW
 EXECUTE FUNCTION public.sync_user_status_and_active();
 
 -- 1. USERS (Bao gồm dữ liệu CSV cũ + Thêm Admin & Trạng thái làm việc)
--- Tài khoản Demo: admin@gmail.com (admin123), pt@gmail.com (pt123), user@gmail.com (user123), staff@gmail.com (staff123)
+-- Tài khoản Demo: admin@gmail.com, pt@gmail.com, user@gmail.com, staff@gmail.com
 INSERT INTO public.users (id, email, password, role, full_name, phone, birth_date, gender, height, is_active, status, created_at, updated_at) VALUES
 (1, 'user1@gympro.com', '$2b$10$mj/JdTlXx46aTqTieyn0wefceMei7IWLo/MyErZVf6Vvs155DiYJa', 'HV', 'Thanh Truong', '034567891', NULL, NULL, NULL, true, 'working', '2026-06-13 11:50:46', '2026-06-13 11:50:46'),
-(2, 'user@gmail.com', '$2b$10$GiwS3uAezgNkCOjCg.j5GeV3J4rv7McayZ.Tc6ufIW/CZuqsLAho6', 'HV', 'Thành (Demo User)', '0123456789', '2000-01-01', 'male', 170.00, true, 'working', '2026-06-13 11:56:57', '2026-06-13 11:56:57'),
-(3, 'pt@gmail.com', '$2b$10$njE85/O5.9V4w00sBlUiWeBpIW6uMYcg9OukZZE43miIPQ3HPPd1C', 'PT', 'Trọng (Demo PT)', '0345678912', '1995-05-15', 'male', 180.00, true, 'working', '2026-06-13 12:00:20', '2026-06-13 12:00:20'),
+(2, 'user@gmail.com', '$2b$10$fyezjn8VldYIpgfuzD9kwusBsunyRnXlX1CFLZstLYda3ITi1n8/a', 'HV', 'Thành (Demo User)', '0123456789', '2000-01-01', 'male', 170.00, true, 'working', '2026-06-13 11:56:57', '2026-06-13 11:56:57'),
+(3, 'pt@gmail.com', '$2b$10$6CBozHo//Un2AJkZgoeL2e8DgZ.6lCSIhTUwxHuKAQaIaCcFSdTUy', 'PT', 'Trọng (Demo PT)', '0345678912', '1995-05-15', 'male', 180.00, true, 'working', '2026-06-13 12:00:20', '2026-06-13 12:00:20'),
 (4, 'trong.lm@gmail.com', '$2b$10$xOQlBtTX44VJ7Dosye.Nje7fK6s5iZpCQv8fr/fK3RnOAoJ8TW4Mi', 'HV', 'Lê Minh Trọng', '0901111111', '2004-01-10', 'male', 175.00, true, 'working', '2026-06-13 15:23:59', '2026-06-13 15:23:59'),
 (5, 'vinh.ns@gmail.com', '$2b$10$xOQlBtTX44VJ7Dosye.Nje7fK6s5iZpCQv8fr/fK3RnOAoJ8TW4Mi', 'HV', 'Nguyễn Sỹ Vinh', '0902222222', '2004-05-20', 'male', 170.00, true, 'working', '2026-06-13 15:23:59', '2026-06-13 15:23:59'),
 (6, 'tuan.npa@gmail.com', '$2b$10$xOQlBtTX44VJ7Dosye.Nje7fK6s5iZpCQv8fr/fK3RnOAoJ8TW4Mi', 'HV', 'Nguyễn Phạm Anh Tuấn', '0903333333', '2004-08-15', 'male', 178.50, true, 'working', '2026-06-13 15:23:59', '2026-06-13 15:23:59'),
 (7, 'tuan.dd@gmail.com', '$2b$10$xOQlBtTX44VJ7Dosye.Nje7fK6s5iZpCQv8fr/fK3RnOAoJ8TW4Mi', 'HV', 'Đỗ Đức Tuân', '0904444444', '2004-11-25', 'male', 168.00, true, 'working', '2026-06-13 15:23:59', '2026-06-13 15:23:59'),
 (8, 'ha.pt@gmail.com', '$2b$10$xOQlBtTX44VJ7Dosye.Nje7fK6s5iZpCQv8fr/fK3RnOAoJ8TW4Mi', 'HV', 'Phạm Thu Hà', '0905555555', '2004-03-08', 'female', 162.00, true, 'working', '2026-06-13 15:23:59', '2026-06-13 15:23:59'),
 (9, 'my@gmail.com', '$2b$10$ul.g6WUgGYzyUZKO4VMSle1OXG.tycZuUMV9hMDb9gJBgGoy9XfYm', 'HV', 'my', '0987654321', NULL, NULL, NULL, true, 'working', '2026-06-13 22:25:02', '2026-06-13 22:25:02'),
-(10, 'staff@gmail.com', '$2b$10$P7RQNK.FbUpts6g85EYA1O2.i7t0K2LN7AC3w4/Lpaic7lSLrEucy', 'NV', 'Nhân viên 1 (Demo Staff)', '0123761239', '1998-08-08', 'female', 165.00, true, 'working', '2026-06-13 22:25:10', '2026-06-13 22:25:10'),
-(11, 'admin@gmail.com', '$2b$10$fNGZ.Ngu8mx96ug6ZLqzj.5mxQijHRHk/QRNoSCwH236iXI/fw25.', 'AD', 'Admin GymPro', '0999999999', '1990-01-01', 'other', 170.00, true, 'working', now(), now()),
+(10, 'staff@gmail.com', '$2b$10$C.8SaI1ueEyYPVXVrpcxf.iqV2X14VxCscuWYb7iM3gu0Rl3AJ.5.', 'NV', 'Nhân viên 1 (Demo Staff)', '0123761239', '1998-08-08', 'female', 165.00, true, 'working', '2026-06-13 22:25:10', '2026-06-13 22:25:10'),
+(11, 'admin@gmail.com', '$2b$10$6rez6LfCrM/oNkdgoVqtPOapGiq5IrzRrErnBJYja5R0XLHrVEuWG', 'AD', 'Admin GymPro', '0999999999', '1990-01-01', 'other', 170.00, true, 'working', now(), now()),
 (12, 'pt_nghi@gmail.com', '$2b$10$mj/JdTlXx46aTqTieyn0wefceMei7IWLo/MyErZVf6Vvs155DiYJa', 'PT', 'PT Nghỉ Phép', '0888888888', '1992-02-02', 'male', 175.00, true, 'leave', now(), now()),
 (13, 'staff_nghiviec@gmail.com', '$2b$10$mj/JdTlXx46aTqTieyn0wefceMei7IWLo/MyErZVf6Vvs155DiYJa', 'NV', 'Staff Nghỉ Việc', '0777777777', '1996-06-06', 'female', 160.00, false, 'quit', now(), now());
 
@@ -520,3 +520,9 @@ ALTER TABLE public.packages ADD COLUMN pt_sessions integer DEFAULT 0;
 -- 2. Cập nhật dữ liệu cho các gói hiện có
 UPDATE public.packages SET pt_sessions = 36 WHERE id = 'VIP_PT_3M';
 UPDATE public.packages SET pt_sessions = 0 WHERE id IN ('STANDARD_3M', 'BASIC_1M', 'PREMIUM_6M');
+
+-- 15. WORKOUT PLANS
+INSERT INTO public.workout_plans (id, pt_id, trainee_id, name, description, exercises, assigned_date) VALUES
+(1, 3, 2, 'Giáo án Hypertrophy - Tăng Cơ Toàn Diện', 'Tập trung vào các bài tập đa khớp (Compound) ở mức tạ 70-80% 1RM để kích thích phát triển cơ bắp, kết hợp giãn cơ cuối buổi.', '[{"day": "Buổi 1 (Ngực - Vai - Tay sau)", "workouts": [{"name": "Barbell Bench Press", "reps": "8-10", "rest": "90s", "sets": 4}, {"name": "Incline Dumbbell Press", "reps": "10-12", "rest": "60s", "sets": 3}, {"name": "Overhead Press", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Triceps Pushdown", "reps": "12-15", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (Lưng - Xô - Tay trước)", "workouts": [{"name": "Deadlift", "reps": "5-8", "rest": "120s", "sets": 3}, {"name": "Lat Pulldown", "reps": "10-12", "rest": "60s", "sets": 4}, {"name": "Barbell Row", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Bicep Curls", "reps": "12-15", "rest": "45s", "sets": 3}]}]', '2026-06-13'),
+(2, 3, 4, 'Giáo án Cardio & Giảm Mỡ', 'Kết hợp tập tạ nhẹ và các bài Cardio cường độ cao HIIT để tối ưu việc đốt cháy calo trong thời gian ngắn.', '[{"day": "Buổi 1 (Full Body & Cardio)", "workouts": [{"name": "Goblet Squat", "reps": "15", "rest": "60s", "sets": 3}, {"name": "Push ups", "reps": "AMRAP (Tối đa)", "rest": "60s", "sets": 3}, {"name": "Kettlebell Swing", "reps": "20", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (HIIT Treadmill)", "workouts": [{"name": "Đi bộ khởi động", "speed": "5.0 km/h", "duration": "5 phút"}, {"name": "Chạy nước rút (Sprint)", "speed": "14.0 km/h", "repeat": "8 lần", "duration": "30 giây"}, {"name": "Đi bộ nghỉ ngơi giữa các hiệp", "speed": "4.0 km/h", "repeat": "8 lần", "duration": "60 giây"}, {"name": "Đi bộ thả lỏng", "speed": "4.0 km/h", "duration": "5 phút"}]}]', '2026-06-13');
+SELECT setval('public.workout_plans_id_seq', 2, true);

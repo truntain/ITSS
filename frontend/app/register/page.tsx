@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -26,20 +26,34 @@ export default function RegisterPage() {
     fullName: false,
     email: false,
     phone: false,
-    password: false,
-    confirmPassword: false,
+    password: '',
+    confirmPassword: '',
     agreeToTerms: false,
   });
+
+  const validatePassword = (pwd: string): string => {
+    if (!pwd.trim()) return 'Vui lòng nhập mật khẩu';
+    if (pwd.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+    if (!/[A-Z]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 ký tự in hoa';
+    if (!/[0-9]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 chữ số';
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+    return '';
+  };
 
   const handleRegister = async () => {
     setRegisterError(null);
     // Validate inputs
+    const pwdErr = validatePassword(formData.password);
+    let confirmErr = '';
+    if (!formData.confirmPassword.trim()) confirmErr = 'Vui lòng nhập lại mật khẩu';
+    else if (formData.password !== formData.confirmPassword) confirmErr = 'Mật khẩu không khớp';
+
     const newErrors = {
       fullName: !formData.fullName.trim(),
       email: !formData.email.trim(),
       phone: !formData.phone.trim(),
-      password: !formData.password.trim(),
-      confirmPassword: !formData.confirmPassword.trim() || formData.password !== formData.confirmPassword,
+      password: pwdErr,
+      confirmPassword: confirmErr,
       agreeToTerms: !formData.agreeToTerms,
     };
 
@@ -244,7 +258,7 @@ export default function RegisterPage() {
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value });
-                    setErrors({ ...errors, password: false });
+                    setErrors({ ...errors, password: '' });
                   }}
                   onKeyPress={handleKeyPress}
                   placeholder="Mật khẩu"
@@ -259,7 +273,7 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              {errors.password && <p className="text-xs text-red-500 mt-1">Vui lòng nhập mật khẩu</p>}
+              {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
             </div>
 
             {/* Confirm Password Input */}
@@ -276,7 +290,7 @@ export default function RegisterPage() {
                   value={formData.confirmPassword}
                   onChange={(e) => {
                     setFormData({ ...formData, confirmPassword: e.target.value });
-                    setErrors({ ...errors, confirmPassword: false });
+                    setErrors({ ...errors, confirmPassword: '' });
                   }}
                   onKeyPress={handleKeyPress}
                   placeholder="Nhập lại mật khẩu"
@@ -293,9 +307,7 @@ export default function RegisterPage() {
               </div>
               {errors.confirmPassword && (
                 <p className="text-xs text-red-500 mt-1">
-                  {!formData.confirmPassword.trim()
-                    ? 'Vui lòng nhập lại mật khẩu'
-                    : 'Mật khẩu không khớp'}
+                  {errors.confirmPassword}
                 </p>
               )}
             </div>

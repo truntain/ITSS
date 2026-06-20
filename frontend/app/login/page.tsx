@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -11,21 +11,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState(false);
-  const [passwordError, setPasswordError] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  const validatePassword = (pwd: string): string => {
+    if (!pwd.trim()) return 'Vui lòng nhập mật khẩu';
+    if (pwd.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự';
+    if (!/[A-Z]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 ký tự in hoa';
+    if (!/[0-9]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 chữ số';
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+    return '';
+  };
 
   const handleLogin = async () => {
     setLoginError(null);
     // Validate inputs
-    const errors = {
-      email: !emailOrPhone.trim(),
-      password: !password.trim(),
-    };
+    const emailErr = !emailOrPhone.trim();
+    const pwdErr = validatePassword(password);
 
-    setEmailError(errors.email);
-    setPasswordError(errors.password);
+    setEmailError(emailErr);
+    setPasswordError(pwdErr);
 
-    if (!errors.email && !errors.password) {
+    if (!emailErr && !pwdErr) {
       try {
         const response = await fetch(`${'http://localhost:3001'}/auth/login`, {
           method: 'POST',
@@ -168,7 +175,7 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
-            {passwordError && <p className="text-xs text-red-500 mt-1">Vui lòng nhập mật khẩu</p>}
+            {passwordError && <p className="text-xs text-red-500 mt-1">{passwordError}</p>}
           </div>
 
           {/* Forgot Password Link */}
