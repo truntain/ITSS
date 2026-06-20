@@ -105,13 +105,13 @@ ITSS/
     ```
 3.  Cấu hình file môi trường `.env` (Nếu chưa có, hãy tạo file [backend/.env](file:///d:/ITSS/backend/.env) với nội dung):
     ```env
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_USERNAME=postgres
-    DB_PASSWORD=your_password  # Điền mật khẩu PostgreSQL của bạn
-    DB_NAME=Gympro
-    JWT_SECRET=Gympro
-    JWT_EXPIRATION=3h
+    DB_HOST=your_database_host
+    DB_PORT=your_database_port
+    DB_USERNAME=your_database_username
+    DB_PASSWORD=your_database_password
+    DB_NAME=your_database_name
+    JWT_SECRET=your_jwt_secret
+    JWT_EXPIRATION=your_jwt_expiration_time
     ```
 4.  Chạy Backend ở chế độ phát triển:
     ```bash
@@ -136,10 +136,9 @@ ITSS/
 
 ---
 
-## 🔒 Tài khoản dùng thử (Mặc định trong DB)
-Sau khi import thành công database `backup.sql`, bạn có thể sử dụng các tài khoản demo sau để đăng nhập và trải nghiệm đầy đủ giao diện phân quyền:
+## 🔒 Tài khoản đăng nhập
+Sử dụng các tài khoản quản trị viên, huấn luyện viên (PT), nhân viên và hội viên đã được khởi tạo trong cơ sở dữ liệu của bạn để đăng nhập hệ thống.
 
-*   **Tài khoản Admin:** `admin@gympro.com` / Mật khẩu: `123456`
-*   **Tài khoản PT (Huấn luyện viên):** `pt1@gympro.com` / Mật khẩu: `123456`
-*   **Tài khoản Staff (Nhân viên):** `staff1@gympro.com` / Mật khẩu: `123456`
-*   **Tài khoản Member (Hội viên):** `member1@gympro.com` / Mật khẩu: `123456`
+*   **Tài khoản quản trị / Nhân sự / PT**: Đăng nhập bằng Email và mật khẩu tương ứng được khởi tạo trong database.
+*   **Tài khoản Hội viên**: Đăng nhập bằng Số điện thoại/Email và mật khẩu hội viên đã đăng ký.
+
