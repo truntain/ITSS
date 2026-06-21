@@ -128,7 +128,7 @@ Di chuyển terminal vào thư mục `backend/` và chạy:
 ## 5. Mô hình Kiến trúc Hệ thống (System Architecture Model)
 
 ### 5.1. Thiết kế kiến trúc (Architectural Design)
-Dưới đây là sơ đồ **Mô hình Client-Server và kiến trúc đa tầng (Layered Architecture)** được áp dụng trong dự án. Sơ đồ này mô phỏng chuẩn cấu trúc phân lớp từ slide thuyết trình của Đại học Bách Khoa Hà Nội (HUST) nhưng được cập nhật chính xác theo stack công nghệ thực tế của dự án (**React Frontend, NestJS Backend & TypeORM** kết nối **PostgreSQL Database**):
+Dưới đây là sơ đồ **Mô hình Client-Server và kiến trúc đa tầng (Layered Architecture)** được áp dụng trong dự án. Sơ đồ này mô phỏng chuẩn cấu trúc phân lớp từ slide thuyết trình của Đại học Bách Khoa Hà Nội (HUST) nhưng được cập nhật chính xác theo stack công nghệ thực tế của dự án (**Next.js Frontend, NestJS Backend & TypeORM** kết nối **PostgreSQL Database**):
 
 ```mermaid
 graph TD
@@ -144,8 +144,8 @@ graph TD
         Admin["Admin"]
     end
     
-    %% React Frontend
-    subgraph Frontend ["React Frontend"]
+    %% Next.js Frontend
+    subgraph Frontend ["Next.js Frontend"]
         direction TB
         Pages["- Pages"]
         Components["- Components"]
@@ -179,7 +179,7 @@ graph TD
 1. **Tầng Người dùng (Clients / Actors):**
    * Gồm các vai trò tương tác chính với hệ thống: **Customer** (Hội viên), **Staff** (Nhân viên), **PT** (Huấn luyện viên cá nhân), và **Admin** (Quản trị viên).
 
-2. **Tầng Giao diện (React Frontend):**
+2. **Tầng Giao diện (Next.js Frontend):**
    * **Pages:** Các màn hình hiển thị chính (Login, Quản lý trang thiết bị, Quản lý hội viên, v.v.).
    * **Components:** Các phần tử UI nhỏ hơn để tái sử dụng (Bảng biểu, Nút bấm, Ô nhập liệu, Popup thông báo).
    * **Context:** Quản lý trạng thái dùng chung cho toàn bộ app (VD: lưu thông tin đăng nhập và token).
