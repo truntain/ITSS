@@ -170,14 +170,14 @@ graph TD
     Backend -- "TypeORM" --> Database
 
     %% Áp dụng Style
-    class Customer,Staff,Company,Admin actorStyle;
+    class Customer,Staff,PT,Admin actorStyle;
     class Pages,Components,Context,APIServices,Controller,Service,Repository,Database boxStyle;
 ```
 
 ### 5.2. Giải thích chi tiết các tầng trong mô hình:
 
 1. **Tầng Người dùng (Clients / Actors):**
-   * Gồm các vai trò tương tác chính với hệ thống: **Customer** (Hội viên), **Staff** (Nhân viên), **Company** (Đối tác), và **Admin** (Quản trị viên).
+   * Gồm các vai trò tương tác chính với hệ thống: **Customer** (Hội viên), **Staff** (Nhân viên), **PT** (Huấn luyện viên cá nhân), và **Admin** (Quản trị viên).
 
 2. **Tầng Giao diện (React Frontend):**
    * **Pages:** Các màn hình hiển thị chính (Login, Quản lý trang thiết bị, Quản lý hội viên, v.v.).
