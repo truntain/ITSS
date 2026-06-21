@@ -140,7 +140,7 @@ graph TD
     subgraph Clients [" "]
         Customer["Customer"]
         Staff["Staff"]
-        Company["Company"]
+        PT["PT"]
         Admin["Admin"]
     end
     
