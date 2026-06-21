@@ -53,7 +53,7 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('nếu báo lỗi BadRequestException nếu thiếu email hoặc mật khẩu', async () => {
+    it('báo lỗi BadRequestException khi thiếu email hoặc mật khẩu', async () => {
       await expect(service.register('', 'Gympro@123')).rejects.toThrow(
         BadRequestException,
       );
@@ -62,7 +62,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('nếu báo lỗi BadRequestException nếu email đã tồn tại', async () => {
+    it('báo lỗi BadRequestException khi email đã tồn tại', async () => {
       mockUsersService.findOneByEmail.mockResolvedValue({ id: 1, email: 'existed@gympro.com' });
 
       await expect(
@@ -71,7 +71,7 @@ describe('AuthService', () => {
       expect(usersService.findOneByEmail).toHaveBeenCalledWith('existed@gympro.com');
     });
 
-    it('nếu đăng ký thành công, hash mật khẩu, tạo user mới và trả về token', async () => {
+    it('đăng ký thành công, hash mật khẩu, tạo user mới và trả về token', async () => {
       // Arrange: Giả lập email chưa tồn tại và tạo user thành công
       mockUsersService.findOneByEmail.mockResolvedValue(null);
       const createdUser = {
@@ -112,7 +112,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('nếu báo lỗi BadRequestException nếu thiếu email hoặc password', async () => {
+    it('báo lỗi BadRequestException khi thiếu email hoặc password', async () => {
       await expect(service.login('', 'Gympro@123')).rejects.toThrow(
         BadRequestException,
       );
@@ -121,7 +121,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('nếu báo lỗi UnauthorizedException nếu email không tồn tại', async () => {
+    it('báo lỗi UnauthorizedException khi email không tồn tại', async () => {
       mockUsersService.findOneByEmail.mockResolvedValue(null);
 
       await expect(
@@ -129,7 +129,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('nếu báo lỗi UnauthorizedException nếu sai mật khẩu', async () => {
+    it('báo lỗi UnauthorizedException khi sai mật khẩu', async () => {
       const mockUser = {
         id: 1,
         email: 'user@gympro.com',
@@ -145,7 +145,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('nếu đăng nhập thành công nếu đúng mật khẩu và trả về token cùng info', async () => {
+    it('đăng nhập thành công khi đúng mật khẩu và trả về token cùng info', async () => {
       const mockUser = {
         id: 1,
         email: 'user@gympro.com',
@@ -172,13 +172,13 @@ describe('AuthService', () => {
   });
 
   describe('getProfile', () => {
-    it('nếu báo lỗi BadRequestException nếu không tìm thấy người dùng', async () => {
+    it('báo lỗi BadRequestException khi không tìm thấy người dùng', async () => {
       mockUsersService.findOne.mockResolvedValue(null);
 
       await expect(service.getProfile(999)).rejects.toThrow(BadRequestException);
     });
 
-    it('nếu trả về thông tin user không chứa password', async () => {
+    it('trả về thông tin user không chứa password', async () => {
       const mockUser = {
         id: 1,
         email: 'user@gympro.com',
@@ -195,13 +195,13 @@ describe('AuthService', () => {
   });
 
   describe('changePassword', () => {
-    it('nếu báo lỗi BadRequestException nếu thiếu thông tin mật khẩu cũ hoặc mới', async () => {
+    it('báo lỗi BadRequestException khi thiếu thông tin mật khẩu cũ hoặc mới', async () => {
       await expect(service.changePassword(1, '', 'newpass')).rejects.toThrow(
         BadRequestException,
       );
     });
 
-    it('nếu báo lỗi BadRequestException nếu mật khẩu cũ không chính xác', async () => {
+    it('báo lỗi BadRequestException khi mật khẩu cũ không chính xác', async () => {
       const mockUser = {
         id: 1,
         email: 'user@gympro.com',
@@ -215,7 +215,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('nếu thay đổi mật khẩu thành công, mã hóa mật khẩu mới và lưu vào DB', async () => {
+    it('thay đổi mật khẩu thành công, mã hóa mật khẩu mới và lưu vào DB', async () => {
       const mockUser = {
         id: 1,
         email: 'user@gympro.com',

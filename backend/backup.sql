@@ -198,6 +198,7 @@ CREATE TABLE public.memberships (
     end_date date NOT NULL,
     total_sessions integer DEFAULT 0,
     remaining_sessions integer DEFAULT 0,
+    voucher_code character varying(50),
     status character varying(20) DEFAULT 'active'::character varying,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),
@@ -520,9 +521,3 @@ ALTER TABLE public.packages ADD COLUMN pt_sessions integer DEFAULT 0;
 -- 2. Cập nhật dữ liệu cho các gói hiện có
 UPDATE public.packages SET pt_sessions = 36 WHERE id = 'VIP_PT_3M';
 UPDATE public.packages SET pt_sessions = 0 WHERE id IN ('STANDARD_3M', 'BASIC_1M', 'PREMIUM_6M');
-
--- 15. WORKOUT PLANS
-INSERT INTO public.workout_plans (id, pt_id, trainee_id, name, description, exercises, assigned_date) VALUES
-(1, 3, 2, 'Giáo án Hypertrophy - Tăng Cơ Toàn Diện', 'Tập trung vào các bài tập đa khớp (Compound) ở mức tạ 70-80% 1RM để kích thích phát triển cơ bắp, kết hợp giãn cơ cuối buổi.', '[{"day": "Buổi 1 (Ngực - Vai - Tay sau)", "workouts": [{"name": "Barbell Bench Press", "reps": "8-10", "rest": "90s", "sets": 4}, {"name": "Incline Dumbbell Press", "reps": "10-12", "rest": "60s", "sets": 3}, {"name": "Overhead Press", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Triceps Pushdown", "reps": "12-15", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (Lưng - Xô - Tay trước)", "workouts": [{"name": "Deadlift", "reps": "5-8", "rest": "120s", "sets": 3}, {"name": "Lat Pulldown", "reps": "10-12", "rest": "60s", "sets": 4}, {"name": "Barbell Row", "reps": "10", "rest": "60s", "sets": 3}, {"name": "Bicep Curls", "reps": "12-15", "rest": "45s", "sets": 3}]}]', '2026-06-13'),
-(2, 3, 4, 'Giáo án Cardio & Giảm Mỡ', 'Kết hợp tập tạ nhẹ và các bài Cardio cường độ cao HIIT để tối ưu việc đốt cháy calo trong thời gian ngắn.', '[{"day": "Buổi 1 (Full Body & Cardio)", "workouts": [{"name": "Goblet Squat", "reps": "15", "rest": "60s", "sets": 3}, {"name": "Push ups", "reps": "AMRAP (Tối đa)", "rest": "60s", "sets": 3}, {"name": "Kettlebell Swing", "reps": "20", "rest": "45s", "sets": 3}]}, {"day": "Buổi 2 (HIIT Treadmill)", "workouts": [{"name": "Đi bộ khởi động", "speed": "5.0 km/h", "duration": "5 phút"}, {"name": "Chạy nước rút (Sprint)", "speed": "14.0 km/h", "repeat": "8 lần", "duration": "30 giây"}, {"name": "Đi bộ nghỉ ngơi giữa các hiệp", "speed": "4.0 km/h", "repeat": "8 lần", "duration": "60 giây"}, {"name": "Đi bộ thả lỏng", "speed": "4.0 km/h", "duration": "5 phút"}]}]', '2026-06-13');
-SELECT setval('public.workout_plans_id_seq', 2, true);

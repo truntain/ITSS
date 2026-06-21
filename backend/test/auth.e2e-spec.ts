@@ -53,7 +53,7 @@ describe('Auth System (e2e)', () => {
   });
 
   describe('Đăng ký tài khoản (POST /auth/register)', () => {
-    it('nếu đăng ký tài khoản thành công và trả về thông tin user kèm JWT token', async () => {
+    it('đăng ký tài khoản thành công và trả về thông tin user kèm JWT token', async () => {
       const registerPayload = {
         email: 'e2e_user@gympro.com',
         password: 'Gympro@123',
@@ -78,7 +78,7 @@ describe('Auth System (e2e)', () => {
       expect(dbUser?.phone).toBe(registerPayload.phone);
     });
 
-    it('nếu báo lỗi khi đăng ký với email đã tồn tại', async () => {
+    it('báo lỗi khi đăng ký với email đã tồn tại', async () => {
       const duplicatePayload = {
         email: 'e2e_user@gympro.com', // Email đã được tạo ở test trước
         password: 'Gympro@456',
@@ -96,7 +96,7 @@ describe('Auth System (e2e)', () => {
   });
 
   describe('Đăng nhập tài khoản (POST /auth/login)', () => {
-    it('nếu đăng nhập thành công nếu đúng thông tin credentials', async () => {
+    it('đăng nhập thành công khi đúng thông tin credentials', async () => {
       const loginPayload = {
         email: 'e2e_user@gympro.com',
         password: 'Gympro@123',
@@ -111,7 +111,7 @@ describe('Auth System (e2e)', () => {
       expect(response.body.user.email).toBe(loginPayload.email);
     });
 
-    it('nếu báo lỗi 401 khi đăng nhập sai mật khẩu', async () => {
+    it('báo lỗi 401 khi đăng nhập sai mật khẩu', async () => {
       const invalidPayload = {
         email: 'e2e_user@gympro.com',
         password: 'Wrong@123',
