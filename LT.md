@@ -122,3 +122,77 @@ Di chuyển terminal vào thư mục `backend/` và chạy:
   ```bash
   npm run test:e2e
   ```
+
+---
+
+## 5. Mô hình Kiến trúc Hệ thống (System Architecture Model)
+
+### 5.1. Thiết kế kiến trúc (Architectural Design)
+Dưới đây là sơ đồ **Mô hình Client-Server và kiến trúc đa tầng (Layered Architecture)** được áp dụng trong dự án. Sơ đồ này mô phỏng chuẩn cấu trúc phân lớp từ slide thuyết trình của Đại học Bách Khoa Hà Nội (HUST) nhưng được cập nhật chính xác theo stack công nghệ thực tế của dự án (**React Frontend, NestJS Backend & TypeORM** kết nối **PostgreSQL Database**):
+
+```mermaid
+graph TD
+    %% Định nghĩa Style để tối giản màu sắc giống slide
+    classDef actorStyle fill:#ffffff,stroke:#333,stroke-width:1px;
+    classDef boxStyle fill:#ffffff,stroke:#333,stroke-width:1px;
+
+    %% Các Tác Nhân (Clients)
+    subgraph Clients [" "]
+        Customer["Customer"]
+        Staff["Staff"]
+        Company["Company"]
+        Admin["Admin"]
+    end
+    
+    %% React Frontend
+    subgraph Frontend ["React Frontend"]
+        direction TB
+        Pages["- Pages"]
+        Components["- Components"]
+        Context["- Context"]
+        APIServices["- API Services"]
+    end
+
+    %% NestJS Backend
+    subgraph Backend ["NestJS Backend"]
+        direction TB
+        Controller["Controller Layer"]
+        Service["Service Layer"]
+        Repository["Repository Layer (TypeORM)"]
+    end
+
+    %% Database
+    Database["PostgreSQL Database"]
+
+    %% Liên Kết
+    Clients --> Frontend
+    Frontend -- "REST API" --> Backend
+    Backend -- "TypeORM" --> Database
+
+    %% Áp dụng Style
+    class Customer,Staff,Company,Admin actorStyle;
+    class Pages,Components,Context,APIServices,Controller,Service,Repository,Database boxStyle;
+```
+
+### 5.2. Giải thích chi tiết các tầng trong mô hình:
+
+1. **Tầng Người dùng (Clients / Actors):**
+   * Gồm các vai trò tương tác chính với hệ thống: **Customer** (Hội viên), **Staff** (Nhân viên), **Company** (Đối tác), và **Admin** (Quản trị viên).
+
+2. **Tầng Giao diện (React Frontend):**
+   * **Pages:** Các màn hình hiển thị chính (Login, Quản lý trang thiết bị, Quản lý hội viên, v.v.).
+   * **Components:** Các phần tử UI nhỏ hơn để tái sử dụng (Bảng biểu, Nút bấm, Ô nhập liệu, Popup thông báo).
+   * **Context:** Quản lý trạng thái dùng chung cho toàn bộ app (VD: lưu thông tin đăng nhập và token).
+   * **API Services:** Các hàm gọi HTTP client để giao tiếp với máy chủ Backend.
+
+3. **Cầu nối REST API:**
+   * Chuẩn giao tiếp gửi nhận dữ liệu JSON giữa Frontend (Client) và Backend (Server).
+
+4. **Tầng Xử lý Nghiệp vụ (NestJS Backend - Layered Architecture):**
+   * **Controller Layer:** Điểm tiếp nhận request từ client, thực hiện routing và kiểm tra tính hợp lệ sơ bộ của dữ liệu (validation).
+   * **Service Layer:** Chứa toàn bộ logic nghiệp vụ cốt lõi của ứng dụng (đăng ký thẻ, chấm công nhân viên, tạo ca tập, v.v.).
+   * **Repository Layer (TypeORM):** Thực hiện tương tác trực tiếp với Database thông qua thư viện ORM (TypeORM) để truy vấn hoặc cập nhật dữ liệu.
+
+5. **Tầng Cơ sở dữ liệu (PostgreSQL Database):**
+   * Nơi lưu trữ dữ liệu có cấu trúc của hệ thống. Đồng bộ dữ liệu thông qua các kết nối do TypeORM quản lý.
+
